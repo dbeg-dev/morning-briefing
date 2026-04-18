@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dory's Morning Briefing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --cream: #F5F0E8;
+    --ink: #1A1410;
+    --warm-mid: #8B7355;
+    --accent: #C4783A;
+    --accent-light: #E8C4A0;
+    --rule: #D4C4A8;
+    --success: #4A7C59;
+    --error: #8B3A3A;
+    --card-bg: #FDFAF5;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* Masthead */
+  .masthead {
+    border-bottom: 3px double var(--ink);
+    padding: 28px 40px 20px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .masthead-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+  .masthead-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .masthead-meta {
+    font-size: 10px;
+    color: var(--warm-mid);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  /* Status bar */
+  .status-bar {
+    background: var(--ink);
+    color: var(--cream);
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 6px 40px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Main layout */
+  .main {
+    padding: 32px 40px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  /* Generate button */
+  .generate-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 36px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .btn-generate {
+    background: var(--ink);
+    color: var(--cream);
+    border: none;
+    padding: 14px 32px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-generate:hover { background: var(--accent); }
+  .btn-generate:disabled { background: var(--warm-mid); cursor: wait; }
+
+  .generate-desc {
+    font-size: 11px;
+    color: var(--warm-mid);
+    line-height: 1.7;
+    letter-spacing: 0.3px;
+  }
+
+  /* Cards grid */
+  .cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 28px;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--rule);
+    padding: 22px 24px;
+    position: relative;
+  }
+  .card-full { grid-column: 1 / -1; }
+  .card-label {
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--rule);
+  }
+  .card-content {
+    font-size: 13px;
+    line-height: 1.85;
+    color: var(--ink);
+    white-space: pre-wrap;
+    min-height: 60px;
+  }
+  .card-content.placeholder {
+    color: var(--warm-mid);
+    font-style: italic;
+    font-size: 12px;
+  }
+
+  /* SMS Preview */
+  .sms-preview-section {
+    margin-top: 8px;
+  }
+  .sms-bubble {
+    background: #E8ECF0;
+    border-radius: 18px 18px 18px 4px;
+    padding: 16px 20px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #1A1A1A;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    white-space: pre-wrap;
+    max-width: 500px;
+    position: relative;
+    border: 1px solid #D0D7DE;
+    min-height: 60px;
+  }
+  .sms-meta {
+    font-size: 10px;
+    color: var(--warm-mid);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* Copy btn */
+  .btn-copy {
+    background: transparent;
+    border: 1px solid var(--rule);
+    color: var(--warm-mid);
+    padding: 7px 18px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: all 0.2s;
+  }
+  .btn-copy:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Loading spinner */
+  .spinner {
+    display: none;
+    width: 14px; height: 14px;
+    border: 2px solid var(--cream);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Rule divider */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--rule);
+    margin: 28px 0;
+  }
+
+  /* Footer */
+  .footer {
+    border-top: 3px double var(--ink);
+    padding: 16px 40px;
+    font-size: 10px;
+    color: var(--warm-mid);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Setup note */
+  .setup-box {
+    background: #FFF8EF;
+    border-left: 3px solid var(--accent);
+    padding: 16px 20px;
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--ink);
+  }
+  .setup-box strong { color: var(--accent); }
+
+  .health-input {
+    margin-top: 10px;
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--rule);
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--ink);
+    resize: vertical;
+    min-height: 70px;
+  }
+  .health-input::placeholder { color: var(--warm-mid); }
+  .health-input:focus { outline: 1px solid var(--accent); }
+
+  .input-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--warm-mid);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .error-msg {
+    color: var(--error);
+    font-size: 11px;
+    margin-top: 8px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div>
+    <div class="masthead-title">Good Morning, <em>Dory.</em></div>
+  </div>
+  <div class="masthead-meta">
+    <div id="live-date">—</div>
+    <div>Manhattan, New York</div>
+    <div>Daily Intelligence Briefing</div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span class="status-dot"></span>
+  <span>Claude-Powered · Live Data · 8am Edition</span>
+  <span style="margin-left:auto; opacity:0.5">dory.ellis@gmail.com</span>
+</div>
+
+<div class="main">
+
+  <!-- Health input -->
+  <div style="margin-bottom: 28px;">
+    <label class="input-label">Your health notes for today (optional — paste from Apple Health or type manually)</label>
+    <textarea class="health-input" id="health-input" placeholder="e.g. Sleep: 6h 40min, HRV: 52, Resting HR: 62, Steps yesterday: 7,200. Feeling a bit tired. Skipped workout."></textarea>
+  </div>
+
+  <!-- Generate button -->
+  <div class="generate-section">
+    <button class="btn-generate" id="generate-btn" onclick="generateBriefing()">
+      ▶ Generate Today's Briefing
+      <span class="spinner" id="spinner"></span>
+    </button>
+    <div class="generate-desc">
+      Pulls live Manhattan weather · scans your priority emails · reads your Google Calendar · generates outfit + wellness recommendations · formats your SMS text
+    </div>
+  </div>
+
+  <!-- Cards -->
+  <div class="cards-grid" id="cards-grid">
+
+    <div class="card">
+      <div class="card-label">🌤 Weather · Manhattan</div>
+      <div class="card-content placeholder" id="weather-card">Hit generate to fetch today's forecast…</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">👗 What to Wear</div>
+      <div class="card-content placeholder" id="outfit-card">Outfit suggestion will appear here…</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">📅 Your Day Ahead</div>
+      <div class="card-content placeholder" id="calendar-card">Calendar events will load here…</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">📬 Priority Emails</div>
+      <div class="card-content placeholder" id="email-card">Top emails to action will appear here…</div>
+    </div>
+
+    <div class="card card-full">
+      <div class="card-label">💪 Wellness & Recommendations</div>
+      <div class="card-content placeholder" id="wellness-card">Health-based recommendations will appear here…</div>
+    </div>
+
+  </div>
+
+  <hr class="divider">
+
+  <!-- SMS Preview -->
+  <div class="sms-preview-section">
+    <div class="card-label">📱 SMS Preview — Ready to Send</div>
+    <div class="sms-meta">As it will appear in your text message</div>
+    <div class="sms-bubble" id="sms-bubble">Your briefing will be formatted as an SMS here…</div>
+    <button class="btn-copy" id="copy-btn" onclick="copySMS()">Copy SMS Text</button>
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- Setup instructions -->
+  <div>
+    <div class="card-label">⚙️ Automate This at 8am Daily</div>
+    <div class="setup-box">
+      <strong>To send this briefing as an SMS to your phone every morning at 8am:</strong><br><br>
+      1. <strong>iOS Shortcuts (free, no account needed):</strong><br>
+      &nbsp;&nbsp;• Open the Shortcuts app → Automation → New Automation → Time of Day → 8:00 AM → Daily<br>
+      &nbsp;&nbsp;• Add action: "Open URL" → paste this URL (bookmark it first)<br>
+      &nbsp;&nbsp;• Add action: "Get Contents of URL" (optional, to auto-fetch)<br><br>
+      2. <strong>Send yourself an SMS automatically:</strong><br>
+      &nbsp;&nbsp;• In the same Shortcut, after opening this page, add "Send Message" → To: your number → paste the SMS text<br>
+      &nbsp;&nbsp;• Or use <strong>IFTTT / Make.com</strong> to call this page and forward the output to your phone via Twilio SMS<br><br>
+      3. <strong>Apple Health data:</strong><br>
+      &nbsp;&nbsp;• Each morning, open Apple Health → Summary → copy your sleep & activity stats into the health notes box above before generating<br>
+      &nbsp;&nbsp;• Or use the <strong>Health Auto Export</strong> app (free) to get a daily health summary emailed to you at 7:55am — paste it in
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  <span>Dory's Morning Briefing · Built with Claude</span>
+  <span id="footer-time">—</span>
+</div>
+
+<script>
+// Live date/time
+function updateTime() {
+  const now = new Date();
+  const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  document.getElementById('live-date').textContent = now.toLocaleDateString('en-US', opts);
+  document.getElementById('footer-time').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+updateTime();
+setInterval(updateTime, 60000);
+
+async function generateBriefing() {
+  const btn = document.getElementById('generate-btn');
+  const spinner = document.getElementById('spinner');
+  const healthNotes = document.getElementById('health-input').value.trim();
+  const errorMsg = document.getElementById('error-msg');
+
+  btn.disabled = true;
+  spinner.style.display = 'inline-block';
+  errorMsg.style.display = 'none';
+
+  // Reset cards
+  const placeholderText = 'Fetching…';
+  ['weather-card','outfit-card','calendar-card','email-card','wellness-card','sms-bubble'].forEach(id => {
+    const el = document.getElementById(id);
+    el.textContent = placeholderText;
+    el.classList.remove('placeholder');
+  });
+
+  try {
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    const prompt = `You are generating Dory's personalized morning briefing for ${today} at ${time}. Dory lives in Manhattan, NYC and is a busy professional actively job searching (SVP role at Birthright Israel Foundation in progress, conversations also at Fi and Kindred). She has a young family and broad interests in arts, music, fashion, and culture.
+
+${healthNotes ? `HEALTH DATA PROVIDED BY USER:\n${healthNotes}\n` : 'No health data provided today — give general wellness advice.'}
+
+Please generate ALL SIX sections below. Be warm, specific, and concise. Write like a smart personal assistant who knows her well.
+
+---
+
+SECTION 1 - WEATHER (2-3 sentences):
+Search your knowledge for typical Manhattan weather for this time of year and season. Give temperature range, conditions, any precipitation. Note if it's good for walking.
+
+SECTION 2 - OUTFIT RECOMMENDATION (3-4 sentences):
+Based on the weather and the fact that Dory has professional meetings (job search in progress), suggest a specific outfit. Reference her preferred brands where natural: Scanlan Theodore, Ferragamo, On Running, Lululemon, Ralph Lauren, Theory, David Yurman. Be specific — colors, layers, shoes.
+
+SECTION 3 - CALENDAR / DAY AHEAD (bullet points):
+Since you don't have live calendar access in this call, write a helpful placeholder: "📅 Sync your Google Calendar and add today's events here before generating — or paste them into the health notes box." Then give 2-3 general time-management tips for a job-search-active day.
+
+SECTION 4 - PRIORITY EMAILS (3-5 bullets):
+Remind Dory of the key email threads she should follow up on today based on what you know:
+• Ruvym Gilman at Birthright Israel Foundation — SVP role update pending, he said he'd have more info after reconnecting with CMO this week
+• Vivian Chan at Austen Riggs — LFE conference May 1–3, she needs to register
+• Elissa Ganz — unread email from Sunday, needs attention
+• Any job search follow-ups at Fi (Victoria Valenti) or Kindred (Somer Reznick)
+
+SECTION 5 - WELLNESS RECOMMENDATIONS (3-4 bullets):
+${healthNotes ? 'Based on the health data provided, give specific, actionable recommendations.' : 'Give 3-4 general wellness tips for a productive day — hydration, movement, mental clarity, energy management.'}
+
+SECTION 6 - SMS VERSION:
+Write a tight SMS (under 300 characters ideally, max 400) that Dory can send herself as a morning nudge. Format:
+"GM Dory ☀️ [temp+condition]. [1 outfit tip]. Top priorities: [2-3 items]. [1 wellness tip]."
+
+---
+
+Respond in this EXACT format with these exact delimiters:
+
+WEATHER_START
+[weather content]
+WEATHER_END
+
+OUTFIT_START
+[outfit content]
+OUTFIT_END
+
+CALENDAR_START
+[calendar content]
+CALENDAR_END
+
+EMAIL_START
+[email content]
+EMAIL_END
+
+WELLNESS_START
+[wellness content]
+WELLNESS_END
+
+SMS_START
+[sms content]
+SMS_END`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        tools: [{
+          type: 'web_search_20250305',
+          name: 'web_search'
+        }],
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+    const data = await response.json();
+
+    // Extract text from all content blocks
+    const fullText = data.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('\n');
+
+    // Parse sections
+    function extract(text, startTag, endTag) {
+      const start = text.indexOf(startTag);
+      const end = text.indexOf(endTag);
+      if (start === -1 || end === -1) return null;
+      return text.slice(start + startTag.length, end).trim();
+    }
+
+    const weather  = extract(fullText, 'WEATHER_START',  'WEATHER_END');
+    const outfit   = extract(fullText, 'OUTFIT_START',   'OUTFIT_END');
+    const calendar = extract(fullText, 'CALENDAR_START', 'CALENDAR_END');
+    const email    = extract(fullText, 'EMAIL_START',    'EMAIL_END');
+    const wellness = extract(fullText, 'WELLNESS_START', 'WELLNESS_END');
+    const sms      = extract(fullText, 'SMS_START',      'SMS_END');
+
+    if (weather)  document.getElementById('weather-card').textContent  = weather;
+    if (outfit)   document.getElementById('outfit-card').textContent   = outfit;
+    if (calendar) document.getElementById('calendar-card').textContent = calendar;
+    if (email)    document.getElementById('email-card').textContent    = email;
+    if (wellness) document.getElementById('wellness-card').textContent = wellness;
+    if (sms)      document.getElementById('sms-bubble').textContent    = sms;
+
+    if (!weather && !outfit) {
+      document.getElementById('error-msg').textContent = 'Could not parse response. Raw output: ' + fullText.slice(0, 200);
+      document.getElementById('error-msg').style.display = 'block';
+    }
+
+  } catch (err) {
+    document.getElementById('error-msg').textContent = 'Error: ' + err.message;
+    document.getElementById('error-msg').style.display = 'block';
+    ['weather-card','outfit-card','calendar-card','email-card','wellness-card'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+function copySMS() {
+  const sms = document.getElementById('sms-bubble').textContent;
+  if (!sms || sms.includes('briefing will be')) return;
+  navigator.clipboard.writeText(sms).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = 'Copy SMS Text', 2000);
+  });
+}
+</script>
+</body>
+</html>
