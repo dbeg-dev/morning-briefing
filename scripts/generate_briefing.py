@@ -1,9 +1,66 @@
 import anthropic
 import json
 import os
+import re
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+
+
+# ── Available.page schedule ───────────────────────────────────────────────
+
+def fetch_available_schedule(today_str):
+    """Fetch busy blocks from dbeg-dev/available and return today's schedule."""
+    try:
+        resp = requests.get(
+            "https://raw.githubusercontent.com/dbeg-dev/available/main/index.html",
+            timeout=10,
+        )
+        resp.raise_for_status()
+        html = resp.text
+
+        # Extract the BUSY array
+        match = re.search(r'const BUSY\s*=\s*(\[.*?\]);', html, re.DOTALL)
+        if not match:
+            print("Available: could not find BUSY array")
+            return None
+        busy = json.loads(match.group(1))
+
+        # Filter to today's blocks
+        today_blocks = [
+            b for b in busy
+            if b["s"].startswith(today_str)
+        ]
+
+        if not today_blocks:
+            print(f"Available: no blocks found for {today_str}")
+            return None
+
+        # Merge overlapping blocks and format
+        events = sorted(today_blocks, key=lambda b: b["s"])
+        merged = []
+        for b in events:
+            s = datetime.fromisoformat(b["s"])
+            e = datetime.fromisoformat(b["e"])
+            # Only keep blocks within the same day
+            if e.date().isoformat() != today_str:
+                e = datetime.fromisoformat(today_str + "T23:59")
+            if merged and s <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(e, merged[-1][1]))
+            else:
+                merged.append((s, e))
+
+        lines = []
+        for s, e in merged:
+            s_str = s.strftime("%-I:%M %p")
+            e_str = e.strftime("%-I:%M %p")
+            lines.append(f"• {s_str} – {e_str}: Blocked")
+
+        print(f"Available: found {len(merged)} blocks for {today_str}")
+        return "\n".join(lines)
+    except Exception as ex:
+        print(f"Available schedule error: {ex}")
+        return None
 
 
 # ── Calendar ──────────────────────────────────────────────────────────────────
@@ -271,11 +328,19 @@ def generate_briefing():
     teams_messages = fetch_teams_messages()
     all_emails     = gmail_emails + outlook_emails + teams_messages
 
-    calendar_section = (
-        f"TODAY'S CALENDAR (live):\n{calendar_text}"
-        if calendar_text else
-        "TODAY'S CALENDAR: No calendar credentials configured — suggest a productive day structure."
-    )
+    today_str = now.strftime("%Y-%m-%d")
+    available_schedule = fetch_available_schedule(today_str)
+
+    if calendar_text:
+        calendar_section = f"TODAY'S CALENDAR (live):\n{calendar_text}"
+    elif available_schedule:
+        calendar_section = (
+            f"TODAY'S SCHEDULE (from availability page — these are confirmed blocked/busy times):\n"
+            f"{available_schedule}\n"
+            f"Working hours: 10:00 AM – 5:00 PM ET. Any unlisted time in that window is free."
+        )
+    else:
+        calendar_section = "TODAY'S CALENDAR: No calendar data available — suggest a productive day structure."
 
     email_section = (
         f"RECENT UNREAD EMAILS + TEAMS CHATS (live):\n" + "\n".join(all_emails)
@@ -306,7 +371,7 @@ OUTFIT_START
 OUTFIT_END
 
 CALENDAR_START
-[Format today's actual calendar events into a clean schedule with prep notes. If no live events, suggest a focused day structure for job search momentum.]
+[Format today's actual calendar events or busy blocks into a clean schedule with free windows and prep notes. If no live events, suggest a focused day structure for job search momentum.]
 CALENDAR_END
 
 EMAIL_START
