@@ -1,0 +1,45 @@
+name: Morning Briefing
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # 8:00 AM EDT (UTC-4, Apr–Oct); change to '0 13 * * *' Nov–Mar (EST)
+  workflow_dispatch:       # allow manual trigger for testing
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install anthropic google-api-python-client google-auth msal requests
+
+      - name: Generate briefing
+        run: python scripts/generate_briefing.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Google Calendar — create a service account, download its JSON key, store as secret,
+          # then share your Google Calendar with the service account email address
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_CALENDAR_ID: ${{ secrets.GOOGLE_CALENDAR_ID }}
+          # Outlook / Microsoft 365 — register an app in Azure AD with Calendars.Read permission
+          # (application permission, not delegated), then grant admin consent
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_CLIENT_SECRET: ${{ secrets.MS_CLIENT_SECRET }}
+          MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
+          MS_USER_EMAIL: ${{ secrets.MS_USER_EMAIL }}
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sms.html
+          git diff --staged --quiet || git commit -m "Morning briefing: $(TZ=America/New_York date +'%A, %B %-d, %Y')"
+          git push
