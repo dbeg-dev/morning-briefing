@@ -147,6 +147,59 @@ def fetch_gmail_emails():
         return []
 
 
+def fetch_teams_messages():
+    client_id     = os.environ.get("MS_CLIENT_ID")
+    client_secret = os.environ.get("MS_CLIENT_SECRET")
+    tenant_id     = os.environ.get("MS_TENANT_ID")
+    user_email    = os.environ.get("MS_USER_EMAIL")
+    if not all([client_id, client_secret, tenant_id, user_email]):
+        return []
+    try:
+        import msal
+
+        app = msal.ConfidentialClientApplication(
+            client_id,
+            authority=f"https://login.microsoftonline.com/{tenant_id}",
+            client_credential=client_secret,
+        )
+        token_result = app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"]
+        )
+        if "access_token" not in token_result:
+            print(f"Teams auth error: {token_result.get('error_description')}")
+            return []
+
+        headers = {"Authorization": f"Bearer {token_result['access_token']}"}
+        resp = requests.get(
+            f"https://graph.microsoft.com/v1.0/users/{user_email}/chats",
+            headers=headers,
+            params={
+                "$expand": "lastMessagePreview",
+                "$top": 10,
+            },
+        )
+        print(f"Teams chats status: {resp.status_code}")
+        if not resp.ok:
+            print(f"Teams chats error body: {resp.text}")
+            return []
+
+        messages = []
+        for chat in resp.json().get("value", []):
+            preview = chat.get("lastMessagePreview", {})
+            if not preview:
+                continue
+            sender = preview.get("from", {}).get("user", {}).get("displayName", "Unknown")
+            body   = preview.get("body", {}).get("content", "")[:120].replace("\n", " ")
+            topic  = chat.get("topic") or f"Chat with {sender}"
+            messages.append(f"[Teams] {topic} — {sender}: {body}")
+
+        print(f"Teams: fetched {len(messages)} recent chat previews")
+        return messages
+    except Exception as e:
+        print(f"Teams error: {e}")
+        return []
+
+
 def fetch_outlook_emails():
     client_id     = os.environ.get("MS_CLIENT_ID")
     client_secret = os.environ.get("MS_CLIENT_SECRET")
@@ -213,7 +266,8 @@ def generate_briefing():
 
     gmail_emails   = fetch_gmail_emails()
     outlook_emails = fetch_outlook_emails()
-    all_emails     = gmail_emails + outlook_emails
+    teams_messages = fetch_teams_messages()
+    all_emails     = gmail_emails + outlook_emails + teams_messages
 
     calendar_section = (
         f"TODAY'S CALENDAR (live):\n{calendar_text}"
@@ -222,9 +276,9 @@ def generate_briefing():
     )
 
     email_section = (
-        f"RECENT UNREAD EMAILS (live):\n" + "\n".join(all_emails)
+        f"RECENT UNREAD EMAILS + TEAMS CHATS (live):\n" + "\n".join(all_emails)
         if all_emails else
-        "RECENT UNREAD EMAILS: No email credentials configured — use these known standing priorities:\n"
+        "RECENT UNREAD EMAILS + TEAMS CHATS: No credentials configured — use these known standing priorities:\n"
         "- Ruvym Gilman / Birthright Israel Foundation: SVP role follow-up\n"
         "- Vivian Chan / Austen Riggs: LFE May 1-3 registration (time-sensitive)\n"
         "- Elissa Ganz: pending reply\n"
