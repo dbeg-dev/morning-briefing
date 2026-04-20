@@ -411,6 +411,15 @@ function updateTime() {
 updateTime();
 setInterval(updateTime, 60000);
 
+// Parse a labelled section from sms.html plain-text format
+function parseBriefingSection(text, sectionLabel, nextLabel) {
+  const start = text.indexOf('\n' + sectionLabel + '\n');
+  if (start === -1) return null;
+  const contentStart = start + sectionLabel.length + 2;
+  const end = nextLabel ? text.indexOf('\n' + nextLabel + '\n', contentStart) : text.indexOf('\n---\n', contentStart);
+  return (end === -1 ? text.slice(contentStart) : text.slice(contentStart, end)).trim();
+}
+
 async function generateBriefing() {
   const btn = document.getElementById('generate-btn');
   const spinner = document.getElementById('spinner');
@@ -429,74 +438,87 @@ async function generateBriefing() {
   errorMsg.style.display = 'none';
 
   // Reset cards
-  const placeholderText = 'Fetching…';
   ['weather-card','outfit-card','calendar-card','email-card','wellness-card','sms-bubble'].forEach(id => {
     const el = document.getElementById(id);
-    el.textContent = placeholderText;
+    el.textContent = 'Fetching…';
     el.classList.remove('placeholder');
   });
+
+  // Fetch automated briefing data (calendar + email) from the repo
+  let calendarSection = 'No live calendar data — suggest a productive day structure for job search.';
+  let emailSection = 'No live email data — use standing priorities: Birthright Israel Foundation (SVP role), Fi (Victoria Valenti), Kindred (Somer Reznick).';
+  try {
+    const briefingResp = await fetch('https://raw.githubusercontent.com/dbeg-dev/morning-briefing/main/sms.html');
+    if (briefingResp.ok) {
+      const briefingText = await briefingResp.text();
+      const cal = parseBriefingSection(briefingText, 'YOUR DAY', 'PRIORITIES');
+      const email = parseBriefingSection(briefingText, 'PRIORITIES', 'WELLNESS');
+      if (cal) calendarSection = `LIVE CALENDAR DATA (from automated briefing — includes Google Calendar + Outlook):\n${cal}`;
+      if (email) emailSection = `LIVE EMAIL PRIORITIES (from automated briefing — includes Gmail + Outlook):\n${email}`;
+    }
+  } catch (e) { /* silently fall back */ }
 
   try {
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-    const prompt = `You are generating Dory's personalized morning briefing for ${today} at ${time}. Dory lives in Manhattan, NYC and is a busy professional actively job searching (SVP role at Birthright Israel Foundation in progress, conversations also at Fi and Kindred). She has a young family and broad interests in arts, music, fashion, and culture.
+    const prompt = `You are generating Dory's personalized morning briefing for ${today} at ${time}. Dory lives in Manhattan, NYC — busy professional, active job search (SVP role at Birthright Israel Foundation, Fi, Kindred), young family, interests in fashion/arts/culture.
 
 ${healthNotes ? `HEALTH DATA PROVIDED BY USER:\n${healthNotes}\n` : 'No health data provided today — give general wellness advice.'}
 
-Please generate ALL SIX sections below. Be warm, specific, and concise. Write like a smart personal assistant who knows her well.
+${calendarSection}
+
+${emailSection}
+
+Please generate ALL SIX sections. Be warm, specific, and concise.
 
 ---
 
 SECTION 1 - WEATHER (2-3 sentences):
-Search your knowledge for typical Manhattan weather for this time of year and season. Give temperature range, conditions, any precipitation. Note if it's good for walking.
+Based on your training knowledge of typical Manhattan weather for ${today}, give temperature range, conditions, precipitation chance. Note if it's good for walking.
 
-SECTION 2 - OUTFIT RECOMMENDATION (3-4 sentences):
-Based on the weather and the fact that Dory has professional meetings (job search in progress), suggest a specific outfit. Reference her preferred brands where natural: Scanlan Theodore, Ferragamo, On Running, Lululemon, Ralph Lauren, Theory, David Yurman. Be specific — colors, layers, shoes.
+SECTION 2 - OUTFIT (3-4 sentences):
+Weather-appropriate professional outfit for a job-search day. Reference her brands: Scanlan Theodore, Ferragamo, On Running, Lululemon, Ralph Lauren, Theory, David Yurman. Be specific — colors, layers, shoes.
 
-SECTION 3 - CALENDAR / DAY AHEAD (bullet points):
-Since you don't have live calendar access in this call, write a helpful placeholder: "📅 Sync your Google Calendar and add today's events here before generating — or paste them into the health notes box." Then give 2-3 general time-management tips for a job-search-active day.
+SECTION 3 - CALENDAR / DAY AHEAD:
+Use the live calendar data provided above. Format as a clean schedule with time blocks and prep notes. If no live events, suggest a focused momentum structure.
 
-SECTION 4 - PRIORITY EMAILS (3-5 bullets):
-Remind Dory of the key email threads she should follow up on today based on what you know:
-• Ruvym Gilman at Birthright Israel Foundation — SVP role update pending, he said he'd have more info after reconnecting with CMO this week
-• Vivian Chan at Austen Riggs — LFE conference May 1–3, she needs to register
-• Elissa Ganz — unread email from Sunday, needs attention
-• Any job search follow-ups at Fi (Victoria Valenti) or Kindred (Somer Reznick)
+SECTION 4 - PRIORITY EMAILS:
+Use the live email priorities provided above. Identify top 3-5 action items, flag anything time-sensitive.
 
-SECTION 5 - WELLNESS RECOMMENDATIONS (3-4 bullets):
-${healthNotes ? 'Based on the health data provided, give specific, actionable recommendations.' : 'Give 3-4 general wellness tips for a productive day — hydration, movement, mental clarity, energy management.'}
+SECTION 5 - WELLNESS (3-4 bullets):
+${healthNotes ? 'Based on the health data provided, give specific actionable recommendations.' : 'General wellness tips: hydration, movement, energy, focus.'}
 
 SECTION 6 - SMS VERSION:
-Write a tight SMS (under 300 characters ideally, max 400) that Dory can send herself as a morning nudge. Format:
-"GM Dory ☀️ [temp+condition]. [1 outfit tip]. Top priorities: [2-3 items]. [1 wellness tip]."
+Tight SMS under 400 chars using the ACTUAL calendar and email data above. Format:
+"GM Dory ☀️ [temp+condition]. [outfit tip]. 📅 [actual events or Clear day]. 📬 [top 2 real priorities]. [wellness tip]."
 
 ---
 
-Respond in this EXACT format with these exact delimiters:
+EXACT response format:
 
 WEATHER_START
-[weather content]
+[content]
 WEATHER_END
 
 OUTFIT_START
-[outfit content]
+[content]
 OUTFIT_END
 
 CALENDAR_START
-[calendar content]
+[content]
 CALENDAR_END
 
 EMAIL_START
-[email content]
+[content]
 EMAIL_END
 
 WELLNESS_START
-[wellness content]
+[content]
 WELLNESS_END
 
 SMS_START
-[sms content]
+[content]
 SMS_END`;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -509,11 +531,7 @@ SMS_END`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        tools: [{
-          type: 'web_search_20250305',
-          name: 'web_search'
-        }],
+        max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       })
     });
