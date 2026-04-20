@@ -144,7 +144,9 @@ WELLNESS_START
 WELLNESS_END
 
 SMS_START
-[Tight SMS under 320 chars: "GM Dory ☀️ [temp+condition]. [1 outfit note]. Day: [top 1-2 calendar items]. Priority: [1 item]. [1 wellness tip]."]
+Write a morning SMS for Dory. Use the ACTUAL calendar events and email priorities generated above — not placeholders. Format:
+"GM Dory \u2600\ufe0f [temp+condition]. [outfit tip]. \U0001f4c5 [actual calendar events, or 'Clear day']. \U0001f4ec [top 2 actual email priorities by name]. [1 wellness tip]."
+Target 400 chars, max 480.
 SMS_END"""
 
     response = client.messages.create(
@@ -158,12 +160,12 @@ SMS_END"""
         block.text for block in response.content if hasattr(block, "text")
     )
 
-    weather  = extract_section(full_text, "WEATHER_START",  "WEATHER_END")  or "—"
-    outfit   = extract_section(full_text, "OUTFIT_START",   "OUTFIT_END")   or "—"
+    weather  = extract_section(full_text, "WEATHER_START",  "WEATHER_END")  or "\u2014"
+    outfit   = extract_section(full_text, "OUTFIT_START",   "OUTFIT_END")   or "\u2014"
     calendar = extract_section(full_text, "CALENDAR_START", "CALENDAR_END") or calendar_text
-    emails   = extract_section(full_text, "EMAIL_START",    "EMAIL_END")    or "—"
-    wellness = extract_section(full_text, "WELLNESS_START", "WELLNESS_END") or "—"
-    sms      = extract_section(full_text, "SMS_START",      "SMS_END")      or "—"
+    emails   = extract_section(full_text, "EMAIL_START",    "EMAIL_END")    or "\u2014"
+    wellness = extract_section(full_text, "WELLNESS_START", "WELLNESS_END") or "\u2014"
+    sms      = extract_section(full_text, "SMS_START",      "SMS_END")      or "\u2014"
 
     content = f"""GOOD MORNING DORY
 {today}
