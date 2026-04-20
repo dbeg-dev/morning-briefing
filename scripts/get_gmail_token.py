@@ -1,31 +1,24 @@
 """
-Run this once locally to get your Gmail OAuth refresh token.
-You'll need a Google Cloud project with the Gmail API enabled.
+Run this once to get your Gmail OAuth refresh token.
+No local server needed — just copy a URL from your browser.
 
-Steps:
-  1. Go to console.cloud.google.com
-  2. Create a project (or use an existing one)
-  3. Enable the Gmail API
-  4. Go to APIs & Services → Credentials → Create Credentials → OAuth client ID
-  5. Choose "Desktop app", download the JSON, note the client_id and client_secret
-  6. Run: python scripts/get_gmail_token.py
-  7. Copy the refresh_token into GitHub Secrets as GOOGLE_REFRESH_TOKEN
-     Also add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as secrets.
+Prerequisites:
+  1. console.cloud.google.com → create a project
+  2. Enable the Gmail API
+  3. APIs & Services → Credentials → Create OAuth Client ID → Desktop app
+  4. Note the Client ID and Client Secret
+  5. Run: python3 scripts/get_gmail_token.py
 """
 
 import json
-import sys
 import urllib.parse
 import urllib.request
-import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer
-
 
 CLIENT_ID     = input("Paste your Google OAuth Client ID: ").strip()
 CLIENT_SECRET = input("Paste your Google OAuth Client Secret: ").strip()
 
-SCOPES       = "https://www.googleapis.com/auth/gmail.readonly"
 REDIRECT_URI = "http://localhost:8080"
+SCOPES       = "https://www.googleapis.com/auth/gmail.readonly"
 
 auth_url = (
     "https://accounts.google.com/o/oauth2/v2/auth?"
@@ -39,31 +32,23 @@ auth_url = (
     })
 )
 
-print(f"\nOpening browser for Google authorization...")
-webbrowser.open(auth_url)
-print(f"If it didn't open, visit:\n{auth_url}\n")
+print("\n" + "="*60)
+print("STEP 1: Open this URL in your browser:")
+print("="*60)
+print(auth_url)
+print("="*60)
+print("\nSign in with your Gmail account and click Allow.")
+print("The browser will then show a connection error — that's OK.")
+print("\nSTEP 2: Copy the full URL from your browser's address bar")
+print("and paste it below (it starts with http://localhost:8080/?code=...)\n")
 
-auth_code = None
-
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        global auth_code
-        params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        auth_code = params.get("code", [None])[0]
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"<h2>Authorization complete. You can close this tab.</h2>")
-
-    def log_message(self, *args):
-        pass
-
-print("Waiting for authorization (listening on http://localhost:8080)...")
-server = HTTPServer(("localhost", 8080), Handler)
-server.handle_request()
+redirect_url = input("Paste the full redirect URL here: ").strip()
+params = urllib.parse.parse_qs(urllib.parse.urlparse(redirect_url).query)
+auth_code = params.get("code", [None])[0]
 
 if not auth_code:
-    print("Error: no auth code received.")
-    sys.exit(1)
+    print("Error: could not find code in URL. Make sure you copied the full address bar URL.")
+    exit(1)
 
 data = urllib.parse.urlencode({
     "code":          auth_code,
@@ -73,12 +58,12 @@ data = urllib.parse.urlencode({
     "grant_type":    "authorization_code",
 }).encode()
 
-req  = urllib.request.Request("https://oauth2.googleapis.com/token", data=data)
-resp = urllib.request.urlopen(req)
+req    = urllib.request.Request("https://oauth2.googleapis.com/token", data=data)
+resp   = urllib.request.urlopen(req)
 tokens = json.loads(resp.read())
 
 print("\n" + "="*60)
-print("SUCCESS — add these three secrets to GitHub:")
+print("SUCCESS \u2014 add these three secrets to GitHub:")
 print("="*60)
 print(f"GOOGLE_CLIENT_ID     = {CLIENT_ID}")
 print(f"GOOGLE_CLIENT_SECRET = {CLIENT_SECRET}")
