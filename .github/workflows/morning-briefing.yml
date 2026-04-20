@@ -2,7 +2,7 @@ name: Morning Briefing
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # 8:00 AM EDT (UTC-4, Apr–Oct); adjust to '0 13 * * *' in winter (EST)
+    - cron: '0 12 * * *'  # 8:00 AM EDT (UTC-4, Apr–Oct); change to '0 13 * * *' Nov–Mar (EST)
   workflow_dispatch:       # allow manual trigger for testing
 
 jobs:
@@ -19,12 +19,22 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install anthropic
+        run: pip install anthropic google-api-python-client google-auth msal requests
 
       - name: Generate briefing
         run: python scripts/generate_briefing.py
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Google Calendar — create a service account, download its JSON key, store as secret,
+          # then share your Google Calendar with the service account email address
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          GOOGLE_CALENDAR_ID: ${{ secrets.GOOGLE_CALENDAR_ID }}
+          # Outlook / Microsoft 365 — register an app in Azure AD with Calendars.Read permission
+          # (application permission, not delegated), then grant admin consent
+          MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
+          MS_CLIENT_SECRET: ${{ secrets.MS_CLIENT_SECRET }}
+          MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
+          MS_USER_EMAIL: ${{ secrets.MS_USER_EMAIL }}
 
       - name: Commit and push
         run: |
