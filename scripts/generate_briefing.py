@@ -144,7 +144,9 @@ WELLNESS_START
 WELLNESS_END
 
 SMS_START
-[Tight SMS under 320 chars: "GM Dory ☀️ [temp+condition]. [1 outfit note]. Day: [top 1-2 calendar items]. Priority: [1 item]. [1 wellness tip]."]
+Write a morning SMS for Dory. Use the ACTUAL calendar events and email priorities generated above — not placeholders. Format:
+"GM Dory ☀️ [temp+condition]. [outfit tip]. 📅 [actual calendar events, or 'Clear day']. 📬 [top 2 actual email priorities by name]. [1 wellness tip]."
+Target 400 chars, max 480.
 SMS_END"""
 
     response = client.messages.create(
