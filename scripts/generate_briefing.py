@@ -33,7 +33,9 @@ def fetch_google_events(now):
             singleEvents=True,
             orderBy="startTime",
         ).execute()
-        return result.get("items", [])
+        events = result.get("items", [])
+        print(f"Google Calendar: fetched {len(events)} events")
+        return events
     except Exception as e:
         print(f"Google Calendar error: {e}")
         return []
@@ -94,7 +96,7 @@ def format_calendar_events(google_events, outlook_events, tz):
     return "\n".join(lines) if lines else None
 
 
-# ── Email ─────────────────────────────────────────────────────────────────────
+# ── Email + Teams ────────────────────────────────────────────────────────────
 
 def fetch_gmail_emails():
     client_id     = os.environ.get("GOOGLE_CLIENT_ID")
@@ -189,6 +191,59 @@ def fetch_outlook_emails():
         return []
 
 
+def fetch_teams_messages():
+    client_id     = os.environ.get("MS_CLIENT_ID")
+    client_secret = os.environ.get("MS_CLIENT_SECRET")
+    tenant_id     = os.environ.get("MS_TENANT_ID")
+    user_email    = os.environ.get("MS_USER_EMAIL")
+    if not all([client_id, client_secret, tenant_id, user_email]):
+        return []
+    try:
+        import msal
+
+        app = msal.ConfidentialClientApplication(
+            client_id,
+            authority=f"https://login.microsoftonline.com/{tenant_id}",
+            client_credential=client_secret,
+        )
+        token_result = app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"]
+        )
+        if "access_token" not in token_result:
+            print(f"Teams auth error: {token_result.get('error_description')}")
+            return []
+
+        headers = {"Authorization": f"Bearer {token_result['access_token']}"}
+        resp = requests.get(
+            f"https://graph.microsoft.com/v1.0/users/{user_email}/chats",
+            headers=headers,
+            params={
+                "$expand": "lastMessagePreview",
+                "$top": 10,
+            },
+        )
+        print(f"Teams chats status: {resp.status_code}")
+        if not resp.ok:
+            print(f"Teams chats error body: {resp.text}")
+            return []
+
+        messages = []
+        for chat in resp.json().get("value", []):
+            preview = chat.get("lastMessagePreview", {})
+            if not preview:
+                continue
+            sender = preview.get("from", {}).get("user", {}).get("displayName", "Unknown")
+            body   = preview.get("body", {}).get("content", "")[:120].replace("\n", " ")
+            topic  = chat.get("topic") or f"Chat with {sender}"
+            messages.append(f"[Teams] {topic} — {sender}: {body}")
+
+        print(f"Teams: fetched {len(messages)} recent chat previews")
+        return messages
+    except Exception as e:
+        print(f"Teams error: {e}")
+        return []
+
+
 # ── Core ──────────────────────────────────────────────────────────────────────
 
 def extract_section(text, start_tag, end_tag):
@@ -213,7 +268,8 @@ def generate_briefing():
 
     gmail_emails   = fetch_gmail_emails()
     outlook_emails = fetch_outlook_emails()
-    all_emails     = gmail_emails + outlook_emails
+    teams_messages = fetch_teams_messages()
+    all_emails     = gmail_emails + outlook_emails + teams_messages
 
     calendar_section = (
         f"TODAY'S CALENDAR (live):\n{calendar_text}"
@@ -222,9 +278,9 @@ def generate_briefing():
     )
 
     email_section = (
-        f"RECENT UNREAD EMAILS (live):\n" + "\n".join(all_emails)
+        f"RECENT UNREAD EMAILS + TEAMS CHATS (live):\n" + "\n".join(all_emails)
         if all_emails else
-        "RECENT UNREAD EMAILS: No email credentials configured — use these known standing priorities:\n"
+        "RECENT UNREAD EMAILS + TEAMS CHATS: No credentials configured — use these known standing priorities:\n"
         "- Ruvym Gilman / Birthright Israel Foundation: SVP role follow-up\n"
         "- Vivian Chan / Austen Riggs: LFE May 1-3 registration (time-sensitive)\n"
         "- Elissa Ganz: pending reply\n"
@@ -254,7 +310,7 @@ CALENDAR_START
 CALENDAR_END
 
 EMAIL_START
-[Using the actual unread emails above, identify and summarize the top 3-5 priority action items. Flag anything time-sensitive. If no live emails, use the standing priorities listed above.]
+[Using the actual unread emails and Teams chats above, identify and summarize the top 3-5 priority action items. Flag anything time-sensitive. If no live data, use the standing priorities listed above.]
 EMAIL_END
 
 WELLNESS_START
