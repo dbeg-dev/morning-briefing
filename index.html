@@ -30,7 +30,6 @@
     overflow-x: hidden;
   }
 
-  /* Masthead */
   .masthead {
     border-bottom: 3px double var(--ink);
     padding: 28px 40px 20px;
@@ -59,7 +58,6 @@
     line-height: 1.8;
   }
 
-  /* Status bar */
   .status-bar {
     background: var(--ink);
     color: var(--cream);
@@ -80,14 +78,12 @@
   }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  /* Main layout */
   .main {
     padding: 32px 40px;
     max-width: 960px;
     margin: 0 auto;
   }
 
-  /* Generate button */
   .generate-section {
     display: flex;
     align-items: center;
@@ -119,7 +115,6 @@
     letter-spacing: 0.3px;
   }
 
-  /* Cards grid */
   .cards-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -162,10 +157,7 @@
     font-size: 12px;
   }
 
-  /* SMS Preview */
-  .sms-preview-section {
-    margin-top: 8px;
-  }
+  .sms-preview-section { margin-top: 8px; }
   .sms-bubble {
     background: #E8ECF0;
     border-radius: 18px 18px 18px 4px;
@@ -176,7 +168,6 @@
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     white-space: pre-wrap;
     max-width: 500px;
-    position: relative;
     border: 1px solid #D0D7DE;
     min-height: 60px;
   }
@@ -188,7 +179,6 @@
     margin-bottom: 10px;
   }
 
-  /* Copy btn */
   .btn-copy {
     background: transparent;
     border: 1px solid var(--rule);
@@ -204,7 +194,6 @@
   }
   .btn-copy:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* Loading spinner */
   .spinner {
     display: none;
     width: 14px; height: 14px;
@@ -217,14 +206,12 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Rule divider */
   .divider {
     border: none;
     border-top: 1px solid var(--rule);
     margin: 28px 0;
   }
 
-  /* Footer */
   .footer {
     border-top: 3px double var(--ink);
     padding: 16px 40px;
@@ -237,7 +224,6 @@
     align-items: center;
   }
 
-  /* Setup note */
   .setup-box {
     background: #FFF8EF;
     border-left: 3px solid var(--accent);
@@ -302,6 +288,12 @@
 
 <div class="main">
 
+  <!-- API key input -->
+  <div style="margin-bottom: 20px;">
+    <label class="input-label">Anthropic API key (saved locally, never sent anywhere else)</label>
+    <input type="password" class="health-input" id="api-key-input" placeholder="sk-ant-api03-…" style="min-height: unset; height: 40px; resize: none;">
+  </div>
+
   <!-- Health input -->
   <div style="margin-bottom: 28px;">
     <label class="input-label">Your health notes for today (optional — paste from Apple Health or type manually)</label>
@@ -343,7 +335,7 @@
     </div>
 
     <div class="card card-full">
-      <div class="card-label">💪 Wellness & Recommendations</div>
+      <div class="card-label">💪 Wellness &amp; Recommendations</div>
       <div class="card-content placeholder" id="wellness-card">Health-based recommendations will appear here…</div>
     </div>
 
@@ -375,7 +367,7 @@
       &nbsp;&nbsp;• In the same Shortcut, after opening this page, add "Send Message" → To: your number → paste the SMS text<br>
       &nbsp;&nbsp;• Or use <strong>IFTTT / Make.com</strong> to call this page and forward the output to your phone via Twilio SMS<br><br>
       3. <strong>Apple Health data:</strong><br>
-      &nbsp;&nbsp;• Each morning, open Apple Health → Summary → copy your sleep & activity stats into the health notes box above before generating<br>
+      &nbsp;&nbsp;• Each morning, open Apple Health → Summary → copy your sleep &amp; activity stats into the health notes box above before generating<br>
       &nbsp;&nbsp;• Or use the <strong>Health Auto Export</strong> app (free) to get a daily health summary emailed to you at 7:55am — paste it in
     </div>
   </div>
@@ -388,6 +380,13 @@
 </div>
 
 <script>
+// Persist API key in localStorage
+const apiKeyInput = document.getElementById('api-key-input');
+apiKeyInput.value = localStorage.getItem('anthropic_api_key') || '';
+apiKeyInput.addEventListener('change', () => {
+  localStorage.setItem('anthropic_api_key', apiKeyInput.value.trim());
+});
+
 // Live date/time
 function updateTime() {
   const now = new Date();
@@ -403,16 +402,21 @@ async function generateBriefing() {
   const spinner = document.getElementById('spinner');
   const healthNotes = document.getElementById('health-input').value.trim();
   const errorMsg = document.getElementById('error-msg');
+  const apiKey = document.getElementById('api-key-input').value.trim();
+  if (!apiKey) {
+    errorMsg.textContent = 'Please enter your Anthropic API key above.';
+    errorMsg.style.display = 'block';
+    return;
+  }
+  localStorage.setItem('anthropic_api_key', apiKey);
 
   btn.disabled = true;
   spinner.style.display = 'inline-block';
   errorMsg.style.display = 'none';
 
-  // Reset cards
-  const placeholderText = 'Fetching…';
   ['weather-card','outfit-card','calendar-card','email-card','wellness-card','sms-bubble'].forEach(id => {
     const el = document.getElementById(id);
-    el.textContent = placeholderText;
+    el.textContent = 'Fetching…';
     el.classList.remove('placeholder');
   });
 
@@ -424,91 +428,50 @@ async function generateBriefing() {
 
 ${healthNotes ? `HEALTH DATA PROVIDED BY USER:\n${healthNotes}\n` : 'No health data provided today — give general wellness advice.'}
 
-Please generate ALL SIX sections below. Be warm, specific, and concise. Write like a smart personal assistant who knows her well.
+Please generate ALL SIX sections below. Be warm, specific, and concise.
 
----
+SECTION 1 - WEATHER (2-3 sentences): Search for live Manhattan weather. Temp, conditions, precipitation, walkability.
 
-SECTION 1 - WEATHER (2-3 sentences):
-Search your knowledge for typical Manhattan weather for this time of year and season. Give temperature range, conditions, any precipitation. Note if it's good for walking.
+SECTION 2 - OUTFIT (3-4 sentences): Specific outfit for weather + professional day. Brands: Scanlan Theodore, Ferragamo, On Running, Lululemon, Ralph Lauren, Theory, David Yurman.
 
-SECTION 2 - OUTFIT RECOMMENDATION (3-4 sentences):
-Based on the weather and the fact that Dory has professional meetings (job search in progress), suggest a specific outfit. Reference her preferred brands where natural: Scanlan Theodore, Ferragamo, On Running, Lululemon, Ralph Lauren, Theory, David Yurman. Be specific — colors, layers, shoes.
-
-SECTION 3 - CALENDAR / DAY AHEAD (bullet points):
-Since you don't have live calendar access in this call, write a helpful placeholder: "📅 Sync your Google Calendar and add today's events here before generating — or paste them into the health notes box." Then give 2-3 general time-management tips for a job-search-active day.
+SECTION 3 - CALENDAR: Helpful day structure for a job-search-active day with 2-3 time blocks.
 
 SECTION 4 - PRIORITY EMAILS (3-5 bullets):
-Remind Dory of the key email threads she should follow up on today based on what you know:
-• Ruvym Gilman at Birthright Israel Foundation — SVP role update pending, he said he'd have more info after reconnecting with CMO this week
-• Vivian Chan at Austen Riggs — LFE conference May 1–3, she needs to register
-• Elissa Ganz — unread email from Sunday, needs attention
-• Any job search follow-ups at Fi (Victoria Valenti) or Kindred (Somer Reznick)
+• Ruvym Gilman / Birthright Israel Foundation — SVP role update
+• Vivian Chan / Austen Riggs — LFE May 1–3 registration
+• Elissa Ganz — pending reply
+• Victoria Valenti (Fi) and Somer Reznick (Kindred) — check ins
 
-SECTION 5 - WELLNESS RECOMMENDATIONS (3-4 bullets):
-${healthNotes ? 'Based on the health data provided, give specific, actionable recommendations.' : 'Give 3-4 general wellness tips for a productive day — hydration, movement, mental clarity, energy management.'}
+SECTION 5 - WELLNESS (3-4 bullets): ${healthNotes ? 'Based on health data provided.' : 'General tips: hydration, movement, clarity, energy.'}
 
-SECTION 6 - SMS VERSION:
-Write a tight SMS (under 300 characters ideally, max 400) that Dory can send herself as a morning nudge. Format:
-"GM Dory ☀️ [temp+condition]. [1 outfit tip]. Top priorities: [2-3 items]. [1 wellness tip]."
+SECTION 6 - SMS (under 400 chars): "GM Dory ☀️ [temp+condition]. [outfit tip]. 📅 [top 1-2 calendar items]. 📬 [top 2 priorities by name]. [wellness tip]."
 
----
-
-Respond in this EXACT format with these exact delimiters:
-
-WEATHER_START
-[weather content]
-WEATHER_END
-
-OUTFIT_START
-[outfit content]
-OUTFIT_END
-
-CALENDAR_START
-[calendar content]
-CALENDAR_END
-
-EMAIL_START
-[email content]
-EMAIL_END
-
-WELLNESS_START
-[wellness content]
-WELLNESS_END
-
-SMS_START
-[sms content]
-SMS_END`;
+EXACT format:
+WEATHER_START\n[content]\nWEATHER_END\nOUTFIT_START\n[content]\nOUTFIT_END\nCALENDAR_START\n[content]\nCALENDAR_END\nEMAIL_START\n[content]\nEMAIL_END\nWELLNESS_START\n[content]\nWELLNESS_END\nSMS_START\n[content]\nSMS_END`;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        tools: [{
-          type: 'web_search_20250305',
-          name: 'web_search'
-        }],
+        max_tokens: 2000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
         messages: [{ role: 'user', content: prompt }]
       })
     });
 
     if (!response.ok) throw new Error(`API error: ${response.status}`);
-
     const data = await response.json();
+    const fullText = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n');
 
-    // Extract text from all content blocks
-    const fullText = data.content
-      .filter(b => b.type === 'text')
-      .map(b => b.text)
-      .join('\n');
-
-    // Parse sections
-    function extract(text, startTag, endTag) {
-      const start = text.indexOf(startTag);
-      const end = text.indexOf(endTag);
-      if (start === -1 || end === -1) return null;
-      return text.slice(start + startTag.length, end).trim();
+    function extract(text, s, e) {
+      const si = text.indexOf(s), ei = text.indexOf(e);
+      return (si === -1 || ei === -1) ? null : text.slice(si + s.length, ei).trim();
     }
 
     const weather  = extract(fullText, 'WEATHER_START',  'WEATHER_END');
@@ -526,13 +489,13 @@ SMS_END`;
     if (sms)      document.getElementById('sms-bubble').textContent    = sms;
 
     if (!weather && !outfit) {
-      document.getElementById('error-msg').textContent = 'Could not parse response. Raw output: ' + fullText.slice(0, 200);
-      document.getElementById('error-msg').style.display = 'block';
+      errorMsg.textContent = 'Could not parse response: ' + fullText.slice(0, 200);
+      errorMsg.style.display = 'block';
     }
 
   } catch (err) {
-    document.getElementById('error-msg').textContent = 'Error: ' + err.message;
-    document.getElementById('error-msg').style.display = 'block';
+    errorMsg.textContent = 'Error: ' + err.message;
+    errorMsg.style.display = 'block';
     ['weather-card','outfit-card','calendar-card','email-card','wellness-card'].forEach(id => {
       document.getElementById(id).textContent = '—';
     });
