@@ -6,12 +6,14 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 
-# ── Calendar ───────────────────────────────────────────────────────────────────────────────
+# ── Calendar ──────────────────────────────────────────────────────────────────
 
 def fetch_google_events(now):
     creds_json  = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
+    print(f"Google Calendar secrets present: credentials_json={'yes' if creds_json else 'NO'}, calendar_id={calendar_id}")
     if not creds_json:
+        print("Google Calendar: skipping — GOOGLE_CREDENTIALS_JSON not set")
         return []
     try:
         from google.oauth2 import service_account
@@ -92,13 +94,15 @@ def format_calendar_events(google_events, outlook_events, tz):
     return "\n".join(lines) if lines else None
 
 
-# ── Email ─────────────────────────────────────────────────────────────────────────────────
+# ── Email ─────────────────────────────────────────────────────────────────────
 
 def fetch_gmail_emails():
     client_id     = os.environ.get("GOOGLE_CLIENT_ID")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
     refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
+    print(f"Gmail secrets present: client_id={'yes' if client_id else 'NO'}, client_secret={'yes' if client_secret else 'NO'}, refresh_token={'yes' if refresh_token else 'NO'}")
     if not all([client_id, client_secret, refresh_token]):
+        print("Gmail: skipping — one or more secrets missing")
         return []
     try:
         token_resp = requests.post("https://oauth2.googleapis.com/token", data={
@@ -107,6 +111,9 @@ def fetch_gmail_emails():
             "refresh_token": refresh_token,
             "grant_type":    "refresh_token",
         })
+        print(f"Gmail token exchange status: {token_resp.status_code}")
+        if not token_resp.ok:
+            print(f"Gmail token error body: {token_resp.text}")
         token_resp.raise_for_status()
         access_token = token_resp.json()["access_token"]
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -116,8 +123,12 @@ def fetch_gmail_emails():
             headers=headers,
             params={"q": "is:unread newer_than:2d", "maxResults": 20},
         )
+        print(f"Gmail search status: {search.status_code}")
+        if not search.ok:
+            print(f"Gmail search error body: {search.text}")
         search.raise_for_status()
         messages = search.json().get("messages", [])
+        print(f"Gmail: found {len(messages)} unread messages")
 
         emails = []
         for msg in messages[:15]:
@@ -129,6 +140,7 @@ def fetch_gmail_emails():
             detail.raise_for_status()
             hdrs = {h["name"]: h["value"] for h in detail.json().get("payload", {}).get("headers", [])}
             emails.append(f"[Gmail] From: {hdrs.get('From', '?')} | Subject: {hdrs.get('Subject', '(no subject)')}")
+        print(f"Gmail: fetched {len(emails)} email summaries")
         return emails
     except Exception as e:
         print(f"Gmail error: {e}")
@@ -177,7 +189,7 @@ def fetch_outlook_emails():
         return []
 
 
-# ── Core ────────────────────────────────────────────────────────────────────────────────
+# ── Core ──────────────────────────────────────────────────────────────────────
 
 def extract_section(text, start_tag, end_tag):
     start = text.find(start_tag)
@@ -210,7 +222,7 @@ def generate_briefing():
     )
 
     email_section = (
-        "RECENT UNREAD EMAILS (live):\n" + "\n".join(all_emails)
+        f"RECENT UNREAD EMAILS (live):\n" + "\n".join(all_emails)
         if all_emails else
         "RECENT UNREAD EMAILS: No email credentials configured — use these known standing priorities:\n"
         "- Ruvym Gilman / Birthright Israel Foundation: SVP role follow-up\n"
@@ -251,7 +263,7 @@ WELLNESS_END
 
 SMS_START
 Write a morning SMS for Dory using ACTUAL calendar events and email priorities above. Format:
-"GM Dory \u2600\ufe0f [temp+condition]. [outfit tip]. \U0001f4c5 [actual events or 'Clear day']. \U0001f4ec [top 2 real priorities by name]. [1 wellness tip]."
+"GM Dory ☀️ [temp+condition]. [outfit tip]. 📅 [actual events or 'Clear day']. 📬 [top 2 real priorities by name]. [1 wellness tip]."
 Target 400 chars, max 480.
 SMS_END"""
 
