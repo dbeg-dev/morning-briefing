@@ -19,30 +19,23 @@ def fetch_available_schedule(today_str):
         resp.raise_for_status()
         html = resp.text
 
-        # Extract the BUSY array
         match = re.search(r'const BUSY\s*=\s*(\[.*?\]);', html, re.DOTALL)
         if not match:
             print("Available: could not find BUSY array")
             return None
         busy = json.loads(match.group(1))
 
-        # Filter to today's blocks
-        today_blocks = [
-            b for b in busy
-            if b["s"].startswith(today_str)
-        ]
+        today_blocks = [b for b in busy if b["s"].startswith(today_str)]
 
         if not today_blocks:
             print(f"Available: no blocks found for {today_str}")
             return None
 
-        # Merge overlapping blocks and format
         events = sorted(today_blocks, key=lambda b: b["s"])
         merged = []
         for b in events:
             s = datetime.fromisoformat(b["s"])
             e = datetime.fromisoformat(b["e"])
-            # Only keep blocks within the same day
             if e.date().isoformat() != today_str:
                 e = datetime.fromisoformat(today_str + "T23:59")
             if merged and s <= merged[-1][1]:
@@ -52,9 +45,7 @@ def fetch_available_schedule(today_str):
 
         lines = []
         for s, e in merged:
-            s_str = s.strftime("%-I:%M %p")
-            e_str = e.strftime("%-I:%M %p")
-            lines.append(f"• {s_str} – {e_str}: Blocked")
+            lines.append(f"• {s.strftime('%-I:%M %p')} – {e.strftime('%-I:%M %p')}: Blocked")
 
         print(f"Available: found {len(merged)} blocks for {today_str}")
         return "\n".join(lines)
@@ -274,10 +265,7 @@ def fetch_teams_messages():
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/chats",
             headers=headers,
-            params={
-                "$expand": "lastMessagePreview",
-                "$top": 10,
-            },
+            params={"$expand": "lastMessagePreview", "$top": 10},
         )
         print(f"Teams chats status: {resp.status_code}")
         if not resp.ok:
@@ -335,7 +323,7 @@ def generate_briefing():
         calendar_section = f"TODAY'S CALENDAR (live):\n{calendar_text}"
     elif available_schedule:
         calendar_section = (
-            f"TODAY'S SCHEDULE (from availability page — these are confirmed blocked/busy times):\n"
+            f"TODAY'S SCHEDULE (from availability page — confirmed blocked/busy times):\n"
             f"{available_schedule}\n"
             f"Working hours: 10:00 AM – 5:00 PM ET. Any unlisted time in that window is free."
         )
@@ -383,9 +371,18 @@ WELLNESS_START
 WELLNESS_END
 
 SMS_START
-Write a morning SMS for Dory using ACTUAL calendar events and email priorities above. Format:
-"GM Dory ☀️ [temp+condition]. [outfit tip]. 📅 [actual events or 'Clear day']. 📬 [top 2 real priorities by name]. [1 wellness tip]."
-Target 400 chars, max 480.
+Write a morning SMS for Dory as a simple readable list. Format exactly like this:
+
+GM Dory ☀️
+
+• [weather: temp + condition]
+• [outfit: one specific item]
+• [schedule: key free window or top event]
+• [priority 1: person + action]
+• [priority 2: person + action]
+• [wellness tip]
+
+Max 6 bullets. Keep each line under 60 chars. No run-on sentences.
 SMS_END"""
 
     response = client.messages.create(
