@@ -10,7 +10,6 @@ from zoneinfo import ZoneInfo
 # ── Available.page schedule ───────────────────────────────────────────────
 
 def fetch_available_schedule(today_str):
-    """Fetch busy blocks from dbeg-dev/available and return today's schedule."""
     try:
         resp = requests.get(
             "https://raw.githubusercontent.com/dbeg-dev/available/main/index.html",
@@ -98,19 +97,15 @@ def fetch_outlook_events(now):
         return []
     try:
         import msal
-
         app = msal.ConfidentialClientApplication(
             client_id,
             authority=f"https://login.microsoftonline.com/{tenant_id}",
             client_credential=client_secret,
         )
-        token_result = app.acquire_token_for_client(
-            scopes=["https://graph.microsoft.com/.default"]
-        )
+        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
         if "access_token" not in token_result:
             print(f"Outlook auth error: {token_result.get('error_description')}")
             return []
-
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end   = now.replace(hour=23, minute=59, second=59, microsecond=0)
         resp = requests.get(
@@ -206,18 +201,14 @@ def fetch_outlook_emails():
         return []
     try:
         import msal
-
         app = msal.ConfidentialClientApplication(
             client_id,
             authority=f"https://login.microsoftonline.com/{tenant_id}",
             client_credential=client_secret,
         )
-        token_result = app.acquire_token_for_client(
-            scopes=["https://graph.microsoft.com/.default"]
-        )
+        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
         if "access_token" not in token_result:
             return []
-
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/messages",
             headers={"Authorization": f"Bearer {token_result['access_token']}"},
@@ -248,19 +239,15 @@ def fetch_teams_messages():
         return []
     try:
         import msal
-
         app = msal.ConfidentialClientApplication(
             client_id,
             authority=f"https://login.microsoftonline.com/{tenant_id}",
             client_credential=client_secret,
         )
-        token_result = app.acquire_token_for_client(
-            scopes=["https://graph.microsoft.com/.default"]
-        )
+        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
         if "access_token" not in token_result:
             print(f"Teams auth error: {token_result.get('error_description')}")
             return []
-
         headers = {"Authorization": f"Bearer {token_result['access_token']}"}
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/chats",
@@ -271,7 +258,6 @@ def fetch_teams_messages():
         if not resp.ok:
             print(f"Teams chats error body: {resp.text}")
             return []
-
         messages = []
         for chat in resp.json().get("value", []):
             preview = chat.get("lastMessagePreview", {})
@@ -281,7 +267,6 @@ def fetch_teams_messages():
             body   = preview.get("body", {}).get("content", "")[:120].replace("\n", " ")
             topic  = chat.get("topic") or f"Chat with {sender}"
             messages.append(f"[Teams] {topic} — {sender}: {body}")
-
         print(f"Teams: fetched {len(messages)} recent chat previews")
         return messages
     except Exception as e:
@@ -371,18 +356,26 @@ WELLNESS_START
 WELLNESS_END
 
 SMS_START
-Write a morning SMS for Dory as a simple readable list. Format exactly like this:
+Write Dory's morning SMS as a clean plain-text digest. Use this exact format — no markdown, no bold, no run-ons:
 
-GM Dory ☀️
+Good morning Dory [day] [date]
 
-• [weather: temp + condition]
-• [outfit: one specific item]
-• [schedule: key free window or top event]
-• [priority 1: person + action]
-• [priority 2: person + action]
-• [wellness tip]
+WEATHER
+[one line: temp, condition, what to bring]
 
-Max 6 bullets. Keep each line under 60 chars. No run-on sentences.
+WEAR
+[one line: specific outfit]
+
+TODAY
+[one line per calendar event or free window — keep it short]
+
+PRIORITIES
+[one line per top 3 email actions — person + what to do]
+
+WELLNESS
+[one line tip]
+
+Keep every line under 55 characters. Phone-readable. No symbols except ✓ or — for separators.
 SMS_END"""
 
     response = client.messages.create(
