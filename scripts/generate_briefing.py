@@ -381,18 +381,26 @@ WELLNESS_START
 WELLNESS_END
 
 SMS_START
-Write a morning SMS for Dory as a simple readable list. Format exactly like this:
+Write Dory's morning SMS as a clean plain-text digest. Use this exact format — no markdown, no bold, no run-ons:
 
-GM Dory ☀️
+Good morning Dory [day] [date]
 
-• [weather: temp + condition]
-• [outfit: one specific item]
-• [schedule: key free window or top event]
-• [priority 1: person + action]
-• [priority 2: person + action]
-• [wellness tip]
+WEATHER
+[one line: temp, condition, what to bring]
 
-Max 6 bullets. Keep each line under 60 chars. No run-on sentences.
+WEAR
+[one line: specific outfit]
+
+TODAY
+[one line per calendar event or free window — keep it short]
+
+PRIORITIES
+[one line per top 3 email actions — person + what to do]
+
+WELLNESS
+[one line tip]
+
+Keep every line under 55 characters. Phone-readable. No symbols except ✓ or — for separators.
 SMS_END"""
 
     response = client.messages.create(
