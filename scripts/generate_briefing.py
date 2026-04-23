@@ -449,6 +449,9 @@ Have a great day.
     with open("sms.html", "w") as f:
         f.write(content)
 
+    with open("sms-clean.txt", "w") as f:
+        f.write(sms)
+
     print(f"Briefing generated for {today}")
     print(content)
 
