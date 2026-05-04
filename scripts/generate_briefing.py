@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 
-# ── Available.page schedule ───────────────────────────────────────────────
+# ── Available.page schedule ─────────────────────────────────────────────────────
 
 def fetch_available_schedule(today_str):
+    """Fetch busy blocks from dbeg-dev/available and return today's schedule."""
     try:
         resp = requests.get(
             "https://raw.githubusercontent.com/dbeg-dev/available/main/index.html",
@@ -18,23 +19,30 @@ def fetch_available_schedule(today_str):
         resp.raise_for_status()
         html = resp.text
 
+        # Extract the BUSY array
         match = re.search(r'const BUSY\s*=\s*(\[.*?\]);', html, re.DOTALL)
         if not match:
             print("Available: could not find BUSY array")
             return None
         busy = json.loads(match.group(1))
 
-        today_blocks = [b for b in busy if b["s"].startswith(today_str)]
+        # Filter to today's blocks
+        today_blocks = [
+            b for b in busy
+            if b["s"].startswith(today_str)
+        ]
 
         if not today_blocks:
             print(f"Available: no blocks found for {today_str}")
             return None
 
+        # Merge overlapping blocks and format
         events = sorted(today_blocks, key=lambda b: b["s"])
         merged = []
         for b in events:
             s = datetime.fromisoformat(b["s"])
             e = datetime.fromisoformat(b["e"])
+            # Only keep blocks within the same day
             if e.date().isoformat() != today_str:
                 e = datetime.fromisoformat(today_str + "T23:59")
             if merged and s <= merged[-1][1]:
@@ -44,7 +52,9 @@ def fetch_available_schedule(today_str):
 
         lines = []
         for s, e in merged:
-            lines.append(f"• {s.strftime('%-I:%M %p')} – {e.strftime('%-I:%M %p')}: Blocked")
+            s_str = s.strftime("%-I:%M %p")
+            e_str = e.strftime("%-I:%M %p")
+            lines.append(f"• {s_str} – {e_str}: Blocked")
 
         print(f"Available: found {len(merged)} blocks for {today_str}")
         return "\n".join(lines)
@@ -53,7 +63,7 @@ def fetch_available_schedule(today_str):
         return None
 
 
-# ── Calendar ──────────────────────────────────────────────────────────────────
+# ── Calendar ────────────────────────────────────────────────────────────────
 
 def fetch_google_events(now):
     creds_json  = os.environ.get("GOOGLE_CREDENTIALS_JSON")
@@ -80,9 +90,7 @@ def fetch_google_events(now):
             singleEvents=True,
             orderBy="startTime",
         ).execute()
-        events = result.get("items", [])
-        print(f"Google Calendar: fetched {len(events)} events")
-        return events
+        return result.get("items", [])
     except Exception as e:
         print(f"Google Calendar error: {e}")
         return []
@@ -97,15 +105,19 @@ def fetch_outlook_events(now):
         return []
     try:
         import msal
+
         app = msal.ConfidentialClientApplication(
             client_id,
             authority=f"https://login.microsoftonline.com/{tenant_id}",
             client_credential=client_secret,
         )
-        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+        token_result = app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"]
+        )
         if "access_token" not in token_result:
             print(f"Outlook auth error: {token_result.get('error_description')}")
             return []
+
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end   = now.replace(hour=23, minute=59, second=59, microsecond=0)
         resp = requests.get(
@@ -139,7 +151,7 @@ def format_calendar_events(google_events, outlook_events, tz):
     return "\n".join(lines) if lines else None
 
 
-# ── Email + Teams ────────────────────────────────────────────────────────────
+# ── Email ───────────────────────────────────────────────────────────────────
 
 def fetch_gmail_emails():
     client_id     = os.environ.get("GOOGLE_CLIENT_ID")
@@ -192,6 +204,59 @@ def fetch_gmail_emails():
         return []
 
 
+def fetch_teams_messages():
+    client_id     = os.environ.get("MS_CLIENT_ID")
+    client_secret = os.environ.get("MS_CLIENT_SECRET")
+    tenant_id     = os.environ.get("MS_TENANT_ID")
+    user_email    = os.environ.get("MS_USER_EMAIL")
+    if not all([client_id, client_secret, tenant_id, user_email]):
+        return []
+    try:
+        import msal
+
+        app = msal.ConfidentialClientApplication(
+            client_id,
+            authority=f"https://login.microsoftonline.com/{tenant_id}",
+            client_credential=client_secret,
+        )
+        token_result = app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"]
+        )
+        if "access_token" not in token_result:
+            print(f"Teams auth error: {token_result.get('error_description')}")
+            return []
+
+        headers = {"Authorization": f"Bearer {token_result['access_token']}"}
+        resp = requests.get(
+            f"https://graph.microsoft.com/v1.0/users/{user_email}/chats",
+            headers=headers,
+            params={
+                "$expand": "lastMessagePreview",
+                "$top": 10,
+            },
+        )
+        print(f"Teams chats status: {resp.status_code}")
+        if not resp.ok:
+            print(f"Teams chats error body: {resp.text}")
+            return []
+
+        messages = []
+        for chat in resp.json().get("value", []):
+            preview = chat.get("lastMessagePreview", {})
+            if not preview:
+                continue
+            sender = preview.get("from", {}).get("user", {}).get("displayName", "Unknown")
+            body   = preview.get("body", {}).get("content", "")[:120].replace("\n", " ")
+            topic  = chat.get("topic") or f"Chat with {sender}"
+            messages.append(f"[Teams] {topic} — {sender}: {body}")
+
+        print(f"Teams: fetched {len(messages)} recent chat previews")
+        return messages
+    except Exception as e:
+        print(f"Teams error: {e}")
+        return []
+
+
 def fetch_outlook_emails():
     client_id     = os.environ.get("MS_CLIENT_ID")
     client_secret = os.environ.get("MS_CLIENT_SECRET")
@@ -201,14 +266,18 @@ def fetch_outlook_emails():
         return []
     try:
         import msal
+
         app = msal.ConfidentialClientApplication(
             client_id,
             authority=f"https://login.microsoftonline.com/{tenant_id}",
             client_credential=client_secret,
         )
-        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+        token_result = app.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"]
+        )
         if "access_token" not in token_result:
             return []
+
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/messages",
             headers={"Authorization": f"Bearer {token_result['access_token']}"},
@@ -230,51 +299,7 @@ def fetch_outlook_emails():
         return []
 
 
-def fetch_teams_messages():
-    client_id     = os.environ.get("MS_CLIENT_ID")
-    client_secret = os.environ.get("MS_CLIENT_SECRET")
-    tenant_id     = os.environ.get("MS_TENANT_ID")
-    user_email    = os.environ.get("MS_USER_EMAIL")
-    if not all([client_id, client_secret, tenant_id, user_email]):
-        return []
-    try:
-        import msal
-        app = msal.ConfidentialClientApplication(
-            client_id,
-            authority=f"https://login.microsoftonline.com/{tenant_id}",
-            client_credential=client_secret,
-        )
-        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
-        if "access_token" not in token_result:
-            print(f"Teams auth error: {token_result.get('error_description')}")
-            return []
-        headers = {"Authorization": f"Bearer {token_result['access_token']}"}
-        resp = requests.get(
-            f"https://graph.microsoft.com/v1.0/users/{user_email}/chats",
-            headers=headers,
-            params={"$expand": "lastMessagePreview", "$top": 10},
-        )
-        print(f"Teams chats status: {resp.status_code}")
-        if not resp.ok:
-            print(f"Teams chats error body: {resp.text}")
-            return []
-        messages = []
-        for chat in resp.json().get("value", []):
-            preview = chat.get("lastMessagePreview", {})
-            if not preview:
-                continue
-            sender = preview.get("from", {}).get("user", {}).get("displayName", "Unknown")
-            body   = preview.get("body", {}).get("content", "")[:120].replace("\n", " ")
-            topic  = chat.get("topic") or f"Chat with {sender}"
-            messages.append(f"[Teams] {topic} — {sender}: {body}")
-        print(f"Teams: fetched {len(messages)} recent chat previews")
-        return messages
-    except Exception as e:
-        print(f"Teams error: {e}")
-        return []
-
-
-# ── Core ──────────────────────────────────────────────────────────────────────
+# ── Core ────────────────────────────────────────────────────────────────────────
 
 def extract_section(text, start_tag, end_tag):
     start = text.find(start_tag)
@@ -308,7 +333,7 @@ def generate_briefing():
         calendar_section = f"TODAY'S CALENDAR (live):\n{calendar_text}"
     elif available_schedule:
         calendar_section = (
-            f"TODAY'S SCHEDULE (from availability page — confirmed blocked/busy times):\n"
+            f"TODAY'S SCHEDULE (from availability page — these are confirmed blocked/busy times):\n"
             f"{available_schedule}\n"
             f"Working hours: 10:00 AM – 5:00 PM ET. Any unlisted time in that window is free."
         )
@@ -344,11 +369,11 @@ OUTFIT_START
 OUTFIT_END
 
 CALENDAR_START
-[Format today's actual calendar events or busy blocks into a clean schedule with free windows and prep notes. If no live events, suggest a focused day structure for job search momentum.]
+[Format today's actual calendar events into a clean schedule with prep notes. If no live events, suggest a focused day structure for job search momentum.]
 CALENDAR_END
 
 EMAIL_START
-[Using the actual unread emails and Teams chats above, identify and summarize the top 3-5 priority action items. Flag anything time-sensitive. If no live data, use the standing priorities listed above.]
+[Using the actual unread emails above, identify and summarize the top 3-5 priority action items. Flag anything time-sensitive. If no live emails, use the standing priorities listed above.]
 EMAIL_END
 
 WELLNESS_START
@@ -423,6 +448,9 @@ Have a great day.
 
     with open("sms.html", "w") as f:
         f.write(content)
+
+    with open("sms-clean.txt", "w") as f:
+        f.write(sms)
 
     print(f"Briefing generated for {today}")
     print(content)
