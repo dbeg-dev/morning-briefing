@@ -2,7 +2,7 @@ name: Morning Briefing
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # 8:00 AM EDT (UTC-4, Apr–Oct); change to '0 13 * * *' Nov–Mar (EST)
+    - cron: '0 9 * * *'   # 5:00 AM EDT (UTC-4, Apr–Oct) / 4:00 AM EST (UTC-5, Nov–Mar) — before sunrise
   workflow_dispatch:       # allow manual trigger for testing
 
 jobs:
