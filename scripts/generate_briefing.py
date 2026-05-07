@@ -6,6 +6,89 @@ import requests
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+# ── Health Plan ─────────────────────────────────────────────────────────────────
+# 7-day rotating plan: 1,500 cal, walks built in (112 E 17th St <-> 622 Third Ave)
+# Mon-Thu = office days (walk commute counts as movement)
+
+HEALTH_PLAN = {
+    0: {  # Monday
+        "workout": "Upper Body Strength — bench press, rows, overhead press, 3x12. Walk commute = warm-up.",
+        "meals": [
+            "Breakfast (350): Scrambled eggs (2) + whole wheat toast + sliced avocado",
+            "Lunch (400): Turkey & hummus wrap, spinach, cucumber, cherry tomatoes",
+            "Snack (150): Greek yogurt + handful of walnuts",
+            "Dinner (500): Grilled chicken thighs + roasted sweet potato + broccoli",
+        ],
+    },
+    1: {  # Tuesday
+        "workout": "Cardio Intervals — 30 min run or bike, 1-min hard / 2-min easy. Walk commute counts.",
+        "meals": [
+            "Breakfast (350): Oatmeal + banana + 1 tbsp peanut butter + cinnamon",
+            "Lunch (400): Big salad: tuna, mixed greens, olives, egg, lemon vinaigrette",
+            "Snack (150): Cottage cheese + sliced peach",
+            "Dinner (500): Shrimp stir-fry with bok choy, snap peas, brown rice",
+        ],
+    },
+    2: {  # Wednesday
+        "workout": "Lower Body Strength — squats, Romanian deadlifts, lunges, glute bridges, 3x12. Walk commute = warm-up.",
+        "meals": [
+            "Breakfast (350): Smoothie — spinach, frozen berries, banana, protein powder, almond milk",
+            "Lunch (400): Lentil soup + side of sliced cucumber + whole wheat pita",
+            "Snack (150): Apple + 1 tbsp almond butter",
+            "Dinner (500): Baked cod + roasted asparagus + quinoa",
+        ],
+    },
+    3: {  # Thursday
+        "workout": "HIIT Full Body — 20 min: burpees, mountain climbers, jump squats, push-ups. Walk commute = bonus.",
+        "meals": [
+            "Breakfast (350): Greek yogurt + blueberries + honey + granola",
+            "Lunch (400): Kale salad: grilled chicken, chickpeas, cucumber, tahini dressing",
+            "Snack (150): Hard-boiled egg + carrots + hummus",
+            "Dinner (500): Baked salmon + roasted asparagus + brown rice",
+        ],
+    },
+    4: {  # Friday
+        "workout": "Active Recovery + Long Walk — 45-60 min walk (try Hudson River Park or High Line). Light stretching.",
+        "meals": [
+            "Breakfast (350): Veggie omelet (2 eggs) + side of berries",
+            "Lunch (400): Grain bowl: farro, roasted veggies, feta, lemon-olive oil",
+            "Snack (150): Handful of almonds + clementine",
+            "Dinner (500): Turkey meatballs + zucchini noodles + marinara",
+        ],
+    },
+    5: {  # Saturday
+        "workout": "Long Cardio or Activity — 60 min hike, swim, yoga, or sport. Make it fun.",
+        "meals": [
+            "Breakfast (350): Whole wheat pancakes (2 small) + fresh berries + maple syrup drizzle",
+            "Lunch (400): Avocado toast + poached egg + side salad",
+            "Snack (150): Edamame + cucumber slices",
+            "Dinner (500): Grilled flank steak + roasted cauliflower + mixed greens",
+        ],
+    },
+    6: {  # Sunday
+        "workout": "Rest + Gentle Movement — restorative yoga, short walk, foam rolling. Prep for the week.",
+        "meals": [
+            "Breakfast (350): Smoked salmon + cream cheese on whole wheat bagel thin",
+            "Lunch (400): Chicken vegetable soup + whole wheat crackers",
+            "Snack (150): Pear + string cheese",
+            "Dinner (500): Roasted chicken breast + Brussels sprouts + mashed cauliflower",
+        ],
+    },
+}
+
+def get_health_section(now):
+    plan = HEALTH_PLAN[now.weekday()]
+    meal_lines = "\n".join(f"• {m}" for m in plan["meals"])
+    return f"Workout: {plan['workout']}\n{meal_lines}\nTotal: ~1,500 cal"
+
+def get_health_sms(now):
+    plan = HEALTH_PLAN[now.weekday()]
+    lines = [plan["workout"]]
+    for m in plan["meals"]:
+        lines.append(m)
+    lines.append("Total: ~1,500 cal")
+    return "\n".join(lines)
+
 
 # ── Available.page schedule ─────────────────────────────────────────────────────
 
@@ -19,30 +102,23 @@ def fetch_available_schedule(today_str):
         resp.raise_for_status()
         html = resp.text
 
-        # Extract the BUSY array
         match = re.search(r'const BUSY\s*=\s*(\[.*?\]);', html, re.DOTALL)
         if not match:
             print("Available: could not find BUSY array")
             return None
-        busy = json.loads(match.group(1))
 
-        # Filter to today's blocks
-        today_blocks = [
-            b for b in busy
-            if b["s"].startswith(today_str)
-        ]
+        busy = json.loads(match.group(1))
+        today_blocks = [b for b in busy if b["s"].startswith(today_str)]
 
         if not today_blocks:
             print(f"Available: no blocks found for {today_str}")
             return None
 
-        # Merge overlapping blocks and format
         events = sorted(today_blocks, key=lambda b: b["s"])
         merged = []
         for b in events:
             s = datetime.fromisoformat(b["s"])
             e = datetime.fromisoformat(b["e"])
-            # Only keep blocks within the same day
             if e.date().isoformat() != today_str:
                 e = datetime.fromisoformat(today_str + "T23:59")
             if merged and s <= merged[-1][1]:
@@ -58,6 +134,7 @@ def fetch_available_schedule(today_str):
 
         print(f"Available: found {len(merged)} blocks for {today_str}")
         return "\n".join(lines)
+
     except Exception as ex:
         print(f"Available schedule error: {ex}")
         return None
@@ -66,12 +143,14 @@ def fetch_available_schedule(today_str):
 # ── Calendar ────────────────────────────────────────────────────────────────
 
 def fetch_google_events(now):
-    creds_json  = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+    creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
     print(f"Google Calendar secrets present: credentials_json={'yes' if creds_json else 'NO'}, calendar_id={calendar_id}")
+
     if not creds_json:
         print("Google Calendar: skipping — GOOGLE_CREDENTIALS_JSON not set")
         return []
+
     try:
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
@@ -80,9 +159,11 @@ def fetch_google_events(now):
             json.loads(creds_json),
             scopes=["https://www.googleapis.com/auth/calendar.readonly"],
         )
-        service   = build("calendar", "v3", credentials=creds)
+        service = build("calendar", "v3", credentials=creds)
+
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end   = now.replace(hour=23, minute=59, second=59, microsecond=0)
+        day_end = now.replace(hour=23, minute=59, second=59, microsecond=0)
+
         result = service.events().list(
             calendarId=calendar_id,
             timeMin=day_start.isoformat(),
@@ -90,19 +171,23 @@ def fetch_google_events(now):
             singleEvents=True,
             orderBy="startTime",
         ).execute()
+
         return result.get("items", [])
+
     except Exception as e:
         print(f"Google Calendar error: {e}")
         return []
 
 
 def fetch_outlook_events(now):
-    client_id     = os.environ.get("MS_CLIENT_ID")
+    client_id = os.environ.get("MS_CLIENT_ID")
     client_secret = os.environ.get("MS_CLIENT_SECRET")
-    tenant_id     = os.environ.get("MS_TENANT_ID")
-    user_email    = os.environ.get("MS_USER_EMAIL")
+    tenant_id = os.environ.get("MS_TENANT_ID")
+    user_email = os.environ.get("MS_USER_EMAIL")
+
     if not all([client_id, client_secret, tenant_id, user_email]):
         return []
+
     try:
         import msal
 
@@ -119,19 +204,21 @@ def fetch_outlook_events(now):
             return []
 
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end   = now.replace(hour=23, minute=59, second=59, microsecond=0)
+        day_end = now.replace(hour=23, minute=59, second=59, microsecond=0)
+
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/calendarView",
             headers={"Authorization": f"Bearer {token_result['access_token']}"},
             params={
                 "startDateTime": day_start.isoformat(),
-                "endDateTime":   day_end.isoformat(),
-                "$orderby":      "start/dateTime",
-                "$select":       "subject,start,end,location",
+                "endDateTime": day_end.isoformat(),
+                "$orderby": "start/dateTime",
+                "$select": "subject,start,end,location",
             },
         )
         resp.raise_for_status()
         return resp.json().get("value", [])
+
     except Exception as e:
         print(f"Outlook Calendar error: {e}")
         return []
@@ -141,11 +228,11 @@ def format_calendar_events(google_events, outlook_events, tz):
     lines = []
     for e in google_events:
         start = e.get("start", {})
-        raw   = start.get("dateTime") or start.get("date", "")
+        raw = start.get("dateTime") or start.get("date", "")
         label = datetime.fromisoformat(raw).astimezone(tz).strftime("%-I:%M %p") if "T" in raw else "All day"
         lines.append(f"• {label} — {e.get('summary', 'Untitled')} [Google]")
     for e in outlook_events:
-        raw   = e.get("start", {}).get("dateTime", "")
+        raw = e.get("start", {}).get("dateTime", "")
         label = datetime.fromisoformat(raw).astimezone(tz).strftime("%-I:%M %p") if raw else "All day"
         lines.append(f"• {label} — {e.get('subject', 'Untitled')} [Outlook]")
     return "\n".join(lines) if lines else None
@@ -154,27 +241,29 @@ def format_calendar_events(google_events, outlook_events, tz):
 # ── Email ───────────────────────────────────────────────────────────────────
 
 def fetch_gmail_emails():
-    client_id     = os.environ.get("GOOGLE_CLIENT_ID")
+    client_id = os.environ.get("GOOGLE_CLIENT_ID")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
     refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
     print(f"Gmail secrets present: client_id={'yes' if client_id else 'NO'}, client_secret={'yes' if client_secret else 'NO'}, refresh_token={'yes' if refresh_token else 'NO'}")
+
     if not all([client_id, client_secret, refresh_token]):
         print("Gmail: skipping — one or more secrets missing")
         return []
+
     try:
         token_resp = requests.post("https://oauth2.googleapis.com/token", data={
-            "client_id":     client_id,
+            "client_id": client_id,
             "client_secret": client_secret,
             "refresh_token": refresh_token,
-            "grant_type":    "refresh_token",
+            "grant_type": "refresh_token",
         })
         print(f"Gmail token exchange status: {token_resp.status_code}")
         if not token_resp.ok:
             print(f"Gmail token error body: {token_resp.text}")
         token_resp.raise_for_status()
         access_token = token_resp.json()["access_token"]
-        headers = {"Authorization": f"Bearer {access_token}"}
 
+        headers = {"Authorization": f"Bearer {access_token}"}
         search = requests.get(
             "https://gmail.googleapis.com/gmail/v1/users/me/messages",
             headers=headers,
@@ -197,20 +286,24 @@ def fetch_gmail_emails():
             detail.raise_for_status()
             hdrs = {h["name"]: h["value"] for h in detail.json().get("payload", {}).get("headers", [])}
             emails.append(f"[Gmail] From: {hdrs.get('From', '?')} | Subject: {hdrs.get('Subject', '(no subject)')}")
+
         print(f"Gmail: fetched {len(emails)} email summaries")
         return emails
+
     except Exception as e:
         print(f"Gmail error: {e}")
         return []
 
 
 def fetch_teams_messages():
-    client_id     = os.environ.get("MS_CLIENT_ID")
+    client_id = os.environ.get("MS_CLIENT_ID")
     client_secret = os.environ.get("MS_CLIENT_SECRET")
-    tenant_id     = os.environ.get("MS_TENANT_ID")
-    user_email    = os.environ.get("MS_USER_EMAIL")
+    tenant_id = os.environ.get("MS_TENANT_ID")
+    user_email = os.environ.get("MS_USER_EMAIL")
+
     if not all([client_id, client_secret, tenant_id, user_email]):
         return []
+
     try:
         import msal
 
@@ -230,10 +323,7 @@ def fetch_teams_messages():
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/chats",
             headers=headers,
-            params={
-                "$expand": "lastMessagePreview",
-                "$top": 10,
-            },
+            params={"$expand": "lastMessagePreview", "$top": 10},
         )
         print(f"Teams chats status: {resp.status_code}")
         if not resp.ok:
@@ -246,24 +336,27 @@ def fetch_teams_messages():
             if not preview:
                 continue
             sender = preview.get("from", {}).get("user", {}).get("displayName", "Unknown")
-            body   = preview.get("body", {}).get("content", "")[:120].replace("\n", " ")
-            topic  = chat.get("topic") or f"Chat with {sender}"
+            body = preview.get("body", {}).get("content", "")[:120].replace("\n", " ")
+            topic = chat.get("topic") or f"Chat with {sender}"
             messages.append(f"[Teams] {topic} — {sender}: {body}")
 
         print(f"Teams: fetched {len(messages)} recent chat previews")
         return messages
+
     except Exception as e:
         print(f"Teams error: {e}")
         return []
 
 
 def fetch_outlook_emails():
-    client_id     = os.environ.get("MS_CLIENT_ID")
+    client_id = os.environ.get("MS_CLIENT_ID")
     client_secret = os.environ.get("MS_CLIENT_SECRET")
-    tenant_id     = os.environ.get("MS_TENANT_ID")
-    user_email    = os.environ.get("MS_USER_EMAIL")
+    tenant_id = os.environ.get("MS_TENANT_ID")
+    user_email = os.environ.get("MS_USER_EMAIL")
+
     if not all([client_id, client_secret, tenant_id, user_email]):
         return []
+
     try:
         import msal
 
@@ -282,10 +375,10 @@ def fetch_outlook_emails():
             f"https://graph.microsoft.com/v1.0/users/{user_email}/messages",
             headers={"Authorization": f"Bearer {token_result['access_token']}"},
             params={
-                "$filter":  "isRead eq false",
+                "$filter": "isRead eq false",
                 "$orderby": "receivedDateTime desc",
-                "$select":  "from,subject,receivedDateTime",
-                "$top":     20,
+                "$select": "from,subject,receivedDateTime",
+                "$top": 20,
             },
         )
         resp.raise_for_status()
@@ -294,6 +387,7 @@ def fetch_outlook_emails():
             sender = e.get("from", {}).get("emailAddress", {}).get("name", "?")
             emails.append(f"[Outlook] From: {sender} | Subject: {e.get('subject', '(no subject)')}")
         return emails
+
     except Exception as e:
         print(f"Outlook email error: {e}")
         return []
@@ -303,7 +397,7 @@ def fetch_outlook_emails():
 
 def extract_section(text, start_tag, end_tag):
     start = text.find(start_tag)
-    end   = text.find(end_tag)
+    end = text.find(end_tag)
     if start == -1 or end == -1:
         return None
     return text[start + len(start_tag):end].strip()
@@ -312,22 +406,26 @@ def extract_section(text, start_tag, end_tag):
 def generate_briefing():
     client = anthropic.Anthropic()
 
-    tz       = ZoneInfo("America/New_York")
-    now      = datetime.now(tz)
-    today    = now.strftime("%A, %B %-d, %Y")
+    tz = ZoneInfo("America/New_York")
+    now = datetime.now(tz)
+    today = now.strftime("%A, %B %-d, %Y")
     time_str = now.strftime("%I:%M %p")
 
-    google_events  = fetch_google_events(now)
+    google_events = fetch_google_events(now)
     outlook_events = fetch_outlook_events(now)
-    calendar_text  = format_calendar_events(google_events, outlook_events, tz)
+    calendar_text = format_calendar_events(google_events, outlook_events, tz)
 
-    gmail_emails   = fetch_gmail_emails()
+    gmail_emails = fetch_gmail_emails()
     outlook_emails = fetch_outlook_emails()
     teams_messages = fetch_teams_messages()
-    all_emails     = gmail_emails + outlook_emails + teams_messages
+    all_emails = gmail_emails + outlook_emails + teams_messages
 
     today_str = now.strftime("%Y-%m-%d")
     available_schedule = fetch_available_schedule(today_str)
+
+    # Health plan for today
+    health_section = get_health_section(now)
+    health_sms = get_health_sms(now)
 
     if calendar_text:
         calendar_section = f"TODAY'S CALENDAR (live):\n{calendar_text}"
@@ -350,18 +448,21 @@ def generate_briefing():
         "- Victoria Valenti (Fi) and Somer Reznick (Kindred): SVP check-ins"
     )
 
-    prompt = f"""Generate Dory's morning briefing for {today} at {time_str}. Dory lives in Manhattan, NYC — busy professional, active job search (SVP role discussions at Birthright Israel Foundation, Fi, Kindred), young family, interests in fashion/arts/culture.
+    prompt = f"""Generate Dory's morning briefing for {today} at {time_str}. Dory lives in Manhattan, NYC (zip code 10003) — busy professional, active job search (SVP role discussions at Birthright Israel Foundation, Fi, Kindred), young family, interests in fashion/arts/culture.
 
-Use web search to get TODAY's live Manhattan weather forecast.
+Use web search to get TODAY's live weather forecast specifically for Manhattan, New York City, NY 10003. Search for "Manhattan NYC weather today {now.strftime('%B %d %Y')}".
 
 {calendar_section}
 
 {email_section}
 
+HEALTH PLAN FOR TODAY (pre-generated — include exactly as-is in the HEALTH and SMS sections):
+{health_section}
+
 Generate these sections with EXACT delimiters:
 
 WEATHER_START
-[2-3 sentences: current temp, conditions, precipitation, walking suitability]
+[2-3 sentences: current temp, conditions, precipitation, walking suitability — Manhattan specific]
 WEATHER_END
 
 OUTFIT_START
@@ -376,8 +477,12 @@ EMAIL_START
 [Using the actual unread emails above, identify and summarize the top 3-5 priority action items. Flag anything time-sensitive. If no live emails, use the standing priorities listed above.]
 EMAIL_END
 
+HEALTH_START
+[Insert the pre-generated health plan exactly as provided above — do not modify it.]
+HEALTH_END
+
 WELLNESS_START
-[3-4 bullet wellness tips for the day — hydration, movement, energy, focus]
+[2-3 bullet wellness tips for the day — hydration, energy, focus. Do NOT repeat the workout or meals here.]
 WELLNESS_END
 
 SMS_START
@@ -386,7 +491,7 @@ Write Dory's morning SMS as a clean plain-text digest. Use this exact format —
 Good morning Dory [day] [date]
 
 WEATHER
-[one line: temp, condition, what to bring]
+[one line: temp, condition, what to bring — Manhattan specific]
 
 WEAR
 [one line: specific outfit]
@@ -397,15 +502,18 @@ TODAY
 PRIORITIES
 [one line per top 3 email actions — person + what to do]
 
+HEALTH
+[Insert the pre-generated health SMS lines exactly as provided — workout + 4 meals + total]
+
 WELLNESS
 [one line tip]
 
-Keep every line under 55 characters. Phone-readable. No symbols except ✓ or — for separators.
+Keep every line under 55 characters. Phone-readable. No symbols except — for separators.
 SMS_END"""
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=8192,
+        max_tokens=3000,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": prompt}],
     )
@@ -414,36 +522,50 @@ SMS_END"""
         block.text for block in response.content if hasattr(block, "text")
     )
 
-    weather  = extract_section(full_text, "WEATHER_START",  "WEATHER_END")  or "—"
-    outfit   = extract_section(full_text, "OUTFIT_START",   "OUTFIT_END")   or "—"
+    weather = extract_section(full_text, "WEATHER_START", "WEATHER_END") or "—"
+    outfit = extract_section(full_text, "OUTFIT_START", "OUTFIT_END") or "—"
     calendar = extract_section(full_text, "CALENDAR_START", "CALENDAR_END") or calendar_text or "—"
-    emails   = extract_section(full_text, "EMAIL_START",    "EMAIL_END")    or "—"
+    emails = extract_section(full_text, "EMAIL_START", "EMAIL_END") or "—"
+    health = extract_section(full_text, "HEALTH_START", "HEALTH_END") or health_section
     wellness = extract_section(full_text, "WELLNESS_START", "WELLNESS_END") or "—"
-    sms      = extract_section(full_text, "SMS_START",      "SMS_END")      or "—"
+    sms = extract_section(full_text, "SMS_START", "SMS_END") or "—"
 
     content = f"""GOOD MORNING DORY
+
 {today}
 
 WEATHER
+
 {weather}
 
 WEAR TODAY
+
 {outfit}
 
 YOUR DAY
+
 {calendar}
 
 PRIORITIES
+
 {emails}
 
+HEALTH
+
+{health}
+
 WELLNESS
+
 {wellness}
 
 ---
+
 SMS
+
 {sms}
 
 Have a great day.
+
 """
 
     with open("sms.html", "w") as f:
