@@ -1,35 +1,34 @@
-Good morning Dory Thursday May 7
+```
+Good morning Dory Friday May 8
 
 WEATHER
-Low 50s now, cloudy, high 64F
-NW winds, possible light shower
-Bring trench coat and umbrella
+61-65F cool and clear — light jacket, no umbrella
 
 WEAR
-Theory trouser, Scanlan knit, RL
-trench, Ferragamo loafer, DY bracelet
+Theory ivory knit, ST charcoal trousers,
+RL camel blazer, Ferragamo nude flats,
+David Yurman cable bracelet
 
 TODAY
-8:45 AM — focus block, job search prep
-11:00 AM — IPC Introductory Call
-12:00 PM — lunch block, read Artnet
-5:00 PM — Zoom with Kirby Fine
-5:00 PM — CASA Jalisco, join late if can
-6:30 PM — Art Week insider event
+7am — Walk: Hudson River Park or High Line
+2:30pm — Salon Ziba Chelsea #100811924205
+6:00pm — Mothers Day Cocktail Hour + Pop-Up
 
 PRIORITIES
-SecureVideo invite from m kim sarasohn
-— confirm or decline today
-Instacart — check updated delivery window
-GitHub enricher failed — triage when able
+LinkedIn — reply to Scibetta msg (3 days old)
+GitHub — check hs-enricher pipeline failure
+Epiq/Terraform — review docket for deadlines
 
 HEALTH
-Workout: HIIT 20 min, walk commute bonus
-Breakfast (350): yogurt, berries, granola
-Lunch (400): kale salad, chicken, tahini
-Snack (150): egg, carrots, hummus
-Dinner (500): salmon, asparagus, rice
-Total: 1,500 cal
+Workout: Active Recovery + Long Walk
+45-60 min walk — High Line or Hudson River
+Light stretching after
+Breakfast (350): Veggie omelet + berries
+Lunch (400): Grain bowl, farro, feta, veggies
+Snack (150): Almonds + clementine
+Dinner (500): Turkey meatballs + zucchini noodles
+Total: ~1,500 cal
 
 WELLNESS
-Drink water before every meeting today
+Drink water now — carry bottle all day
+```
