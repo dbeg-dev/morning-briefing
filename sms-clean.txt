@@ -1,34 +1,35 @@
-```
-Good morning Dory Friday May 8
+Good morning Dory Sunday May 10
 
 WEATHER
-61-65F cool and clear — light jacket, no umbrella
+~69-74F, sunny then clouds PM
+20-30% storm after 2pm
+Bring umbrella just in case
 
 WEAR
-Theory ivory knit, ST charcoal trousers,
-RL camel blazer, Ferragamo nude flats,
-David Yurman cable bracelet
+Theory blouse + sand trousers
+Scanlan Theodore camel blazer
+Ferragamo cognac loafers
+David Yurman bracelet
 
 TODAY
-7am — Walk: Hudson River Park or High Line
-2:30pm — Salon Ziba Chelsea #100811924205
-6:00pm — Mothers Day Cocktail Hour + Pop-Up
+10am-5pm free — no meetings
+Use AM for job search focus
+4:30pm close laptop — family time
+7:00-8:59pm BLOCKED
 
 PRIORITIES
-LinkedIn — reply to Scibetta msg (3 days old)
-GitHub — check hs-enricher pipeline failure
-Epiq/Terraform — review docket for deadlines
+GitHub — fix Morning Briefing run fail
+Reddit — check Microsoft/Publicis thread
+LinkedIn — review CMO role at Talent Project
 
 HEALTH
-Workout: Active Recovery + Long Walk
-45-60 min walk — High Line or Hudson River
-Light stretching after
-Breakfast (350): Veggie omelet + berries
-Lunch (400): Grain bowl, farro, feta, veggies
-Snack (150): Almonds + clementine
-Dinner (500): Turkey meatballs + zucchini noodles
+Workout: Rest + Gentle Movement
+Yoga, short walk, foam rolling
+Breakfast (350): Salmon bagel thin
+Lunch (400): Chicken soup + crackers
+Snack (150): Pear + string cheese
+Dinner (500): Chicken + Brussels + cauli
 Total: ~1,500 cal
 
 WELLNESS
-Drink water now — carry bottle all day
-```
+Drink 64oz water — humid day ahead
