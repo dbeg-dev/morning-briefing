@@ -2,7 +2,7 @@ name: Morning Briefing
 
 on:
   schedule:
-    - cron: '0 9 * * *'   # 5:00 AM EDT (UTC-4, Apr–Oct) / 4:00 AM EST (UTC-5, Nov–Mar) — before sunrise
+    - cron: '0 6 * * *'   # 2:00 AM EDT (UTC-4) — runs ~5-6 AM EDT after GitHub queue delay
   workflow_dispatch:       # allow manual trigger for testing
 
 jobs:
@@ -27,14 +27,11 @@ jobs:
         run: python scripts/generate_briefing.py
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Google Calendar — service account JSON; share your calendar with the service account email
           GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
           GOOGLE_CALENDAR_ID: ${{ secrets.GOOGLE_CALENDAR_ID }}
-          # Gmail — OAuth2 refresh token for reading unread emails
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
-          # Outlook / Microsoft 365 — Azure AD app with Calendars.Read + Mail.Read permissions
           MS_CLIENT_ID: ${{ secrets.MS_CLIENT_ID }}
           MS_CLIENT_SECRET: ${{ secrets.MS_CLIENT_SECRET }}
           MS_TENANT_ID: ${{ secrets.MS_TENANT_ID }}
