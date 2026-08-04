@@ -626,51 +626,6 @@ Have a great day.
     print(f"Briefing generated for {today}")
     print(content)
 
-    send_teams_notification(sms, today)
-
-
-def send_teams_notification(sms_text, today):
-    webhook_url = os.environ.get("TEAMS_WEBHOOK_URL")
-    if not webhook_url:
-        print("Teams: skipping — TEAMS_WEBHOOK_URL not set")
-        return
-
-    payload = {
-        "type": "message",
-        "attachments": [
-            {
-                "contentType": "application/vnd.microsoft.card.adaptive",
-                "content": {
-                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                    "type": "AdaptiveCard",
-                    "version": "1.4",
-                    "body": [
-                        {
-                            "type": "TextBlock",
-                            "text": f"Morning Briefing — {today}",
-                            "weight": "Bolder",
-                            "size": "Medium",
-                            "wrap": True,
-                        },
-                        {
-                            "type": "TextBlock",
-                            "text": sms_text,
-                            "wrap": True,
-                            "fontType": "Monospace",
-                        },
-                    ],
-                },
-            }
-        ],
-    }
-
-    try:
-        resp = requests.post(webhook_url, json=payload, timeout=10)
-        resp.raise_for_status()
-        print(f"Teams: notification sent (status {resp.status_code})")
-    except Exception as e:
-        print(f"Teams notification error: {e}")
-
 
 if __name__ == "__main__":
     generate_briefing()
