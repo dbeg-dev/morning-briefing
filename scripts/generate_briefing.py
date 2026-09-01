@@ -393,6 +393,49 @@ def fetch_outlook_emails():
         return []
 
 
+# ── Weather ─────────────────────────────────────────────────────────────────────
+
+def fetch_weather_wttr(now):
+    """Fetch current weather for Manhattan via wttr.in (no API key required)."""
+    try:
+        resp = requests.get(
+            "https://wttr.in/New+York+City,NY?format=j1",
+            timeout=10,
+            headers={"User-Agent": "morning-briefing/1.0"},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        current = data["current_condition"][0]
+        temp_f = current["temp_F"]
+        feels_f = current["FeelsLikeF"]
+        desc = current["weatherDesc"][0]["value"]
+        humidity = current["humidity"]
+        precip_mm = current["precipMM"]
+        wind_mph = current["windspeedMiles"]
+        today_weather = data["weather"][0]
+        max_f = today_weather["maxtempF"]
+        min_f = today_weather["mintempF"]
+        hourly = today_weather.get("hourly", [])
+        rain_chance = max((int(h.get("chanceofrain", 0)) for h in hourly), default=0)
+        snow_chance = max((int(h.get("chanceofsnow", 0)) for h in hourly), default=0)
+        precip_note = ""
+        if rain_chance >= 40:
+            precip_note = f" Rain likely ({rain_chance}% chance) — bring an umbrella."
+        elif snow_chance >= 40:
+            precip_note = f" Snow likely ({snow_chance}% chance) — dress warmly."
+        elif precip_mm > 0:
+            precip_note = " Light precipitation possible."
+        print(f"Weather: {temp_f}°F, {desc}, high {max_f}°F / low {min_f}°F")
+        return (
+            f"Currently {temp_f}°F (feels like {feels_f}°F), {desc.lower()} in Manhattan. "
+            f"Today's high {max_f}°F, low {min_f}°F; humidity {humidity}%, wind {wind_mph} mph.{precip_note} "
+            f"{'Great for walking.' if int(temp_f) >= 50 and rain_chance < 40 else 'Layer up or shelter as needed.'}"
+        )
+    except Exception as e:
+        print(f"Weather fetch error: {e}")
+        return None
+
+
 # ── Core ────────────────────────────────────────────────────────────────────────
 
 def extract_section(text, start_tag, end_tag):
@@ -422,6 +465,7 @@ def generate_briefing():
 
     today_str = now.strftime("%Y-%m-%d")
     available_schedule = fetch_available_schedule(today_str)
+    live_weather = fetch_weather_wttr(now)
 
     # Health plan for today
     health_section = get_health_section(now)
@@ -448,9 +492,15 @@ def generate_briefing():
         "- Victoria Valenti (Fi) and Somer Reznick (Kindred): SVP check-ins"
     )
 
+    weather_context = (
+        f"TODAY'S LIVE WEATHER (Manhattan, NY 10003):\n{live_weather}"
+        if live_weather else
+        "TODAY'S WEATHER: Data unavailable — use seasonal norms for Manhattan in late spring."
+    )
+
     prompt = f"""Generate Dory's morning briefing for {today} at {time_str}. Dory lives in Manhattan, NYC (zip code 10003) — busy professional, active job search (SVP role discussions at Birthright Israel Foundation, Fi, Kindred), young family, interests in fashion/arts/culture.
 
-Use web search to get TODAY's live weather forecast specifically for Manhattan, New York City, NY 10003. Search for "Manhattan NYC weather today {now.strftime('%B %d %Y')}".
+{weather_context}
 
 {calendar_section}
 
@@ -462,7 +512,7 @@ HEALTH PLAN FOR TODAY (pre-generated — include exactly as-is in the HEALTH and
 Generate these sections with EXACT delimiters:
 
 WEATHER_START
-[2-3 sentences: current temp, conditions, precipitation, walking suitability — Manhattan specific]
+[2-3 sentences using the live weather data above: current temp, conditions, precipitation outlook, walking suitability — Manhattan specific]
 WEATHER_END
 
 OUTFIT_START
@@ -514,7 +564,6 @@ SMS_END"""
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=3000,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": prompt}],
     )
 
