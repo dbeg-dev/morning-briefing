@@ -3,97 +3,257 @@ import json
 import os
 import re
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
-# ── Health Plan ─────────────────────────────────────────────────────────────────
-# 7-day rotating plan: 1,500 cal, walks built in (112 E 17th St <-> 622 Third Ave)
-# Mon-Thu = office days (walk commute counts as movement)
+# ── Full Daily Workout Plans ─────────────────────────────────────────────────────
+# Weights: Lower body 30 lb, Upper body 15-20 lb
+# Week 3: increase 5-10%. Week 4: drop sets on final set of each exercise.
+# Walk to/from 622 Third Ave (~30 min each way Mon-Thu) = warm-up + cool-down.
 
-HEALTH_PLAN = {
+WORKOUTS = {
+    0: {  # Monday — Upper Body A
+        "name": "Upper Body A",
+        "duration": "45 min",
+        "log": "strength 45 min (~220 cal) + walk x2 (~300 cal)",
+        "detail": """WARM-UP (5 min)
+Arm circles, band pull-aparts, shoulder rolls, light cardio
+
+MAIN (35 min) — 60 sec rest between sets
+• Dumbbell Bench Press — 4x10 @ 20 lb
+• Bent-Over Dumbbell Rows — 4x10 @ 20 lb each arm
+• Dumbbell Overhead Press — 3x12 @ 15 lb
+• Lateral Raises — 3x15 @ 10 lb (slow and controlled)
+• Bicep Curls — 3x12 @ 15 lb
+• Tricep Kickbacks — 3x12 @ 15 lb
+• Front Raises — 3x12 @ 10 lb
+
+COOL-DOWN (5 min)
+Chest stretch, shoulder cross-body stretch, tricep overhead stretch
+
+Week 3: increase all weights 2.5-5 lb
+Week 4: final set of each exercise — drop weight 20%, go to failure""",
+    },
+    1: {  # Tuesday — Lower Body A
+        "name": "Lower Body A",
+        "duration": "45 min",
+        "log": "strength 45 min (~220 cal) + walk x2 (~300 cal)",
+        "detail": """WARM-UP (5 min)
+Bodyweight squats x15, hip circles, leg swings, glute bridges x10
+
+MAIN (35 min) — 60 sec rest between sets
+• Goblet Squat — 4x12 @ 30 lb
+• Romanian Deadlift — 4x10 @ 30 lb each hand
+• Reverse Lunges — 3x10 each leg @ 20 lb each hand
+• Hip Thrusts — 4x12 @ 30 lb across hips
+• Calf Raises — 3x20 @ 30 lb each hand
+• Sumo Squat — 3x12 @ 30 lb
+
+COOL-DOWN (5 min)
+Pigeon pose, hamstring stretch, standing quad stretch
+
+Week 3: increase all weights 5 lb
+Week 4: final set of each exercise — drop weight 20%, go to failure""",
+    },
+    2: {  # Wednesday — HIIT + Core
+        "name": "HIIT + Core",
+        "duration": "40 min",
+        "log": "HIIT 25 min (~300 cal) + walk x2 (~300 cal)",
+        "detail": """HIIT BLOCK (25 min)
+40 sec work / 20 sec rest — 5 rounds, 90 sec rest between rounds:
+1. Burpees
+2. Jump Squats
+3. Mountain Climbers
+4. Alternating Reverse Lunges
+5. High Knees
+
+CORE BLOCK (15 min)
+• Plank — 3x45 sec
+• Dead Bug — 3x12 each side (slow and controlled)
+• Hollow Body Hold — 3x30 sec
+• Russian Twists — 3x20 @ 10 lb dumbbell
+• Bicycle Crunches — 3x20
+• Side Plank — 2x30 sec each side
+
+Week 3: push harder on HIIT intervals, add 1 round
+Week 4: max effort every interval — final push""",
+    },
+    3: {  # Thursday — Lower Body B
+        "name": "Lower Body B",
+        "duration": "45 min",
+        "log": "strength 45 min (~220 cal) + walk x2 (~300 cal)",
+        "detail": """WARM-UP (5 min)
+Bodyweight squats x15, hip circles, leg swings, glute bridges x10
+
+MAIN (35 min) — 60 sec rest between sets
+• Deadlift — 4x8 @ 30 lb each hand (heavier, lower reps)
+• Bulgarian Split Squat — 3x10 each leg @ 20 lb each hand
+• Glute Bridges — 3x15 @ 30 lb across hips
+• Step-Ups — 3x12 each leg @ 20 lb each hand (use sturdy chair)
+• Hamstring Curl — 3x12 @ 15 lb dumbbell between feet
+• Wall Sit — 3x45 sec bodyweight
+
+COOL-DOWN (5 min)
+Figure four stretch, hamstring stretch, hip flexor lunge stretch
+
+Week 3: increase all weights 5 lb
+Week 4: final set of each exercise — drop weight 20%, go to failure""",
+    },
+    4: {  # Friday — Upper Body B
+        "name": "Upper Body B",
+        "duration": "45 min",
+        "log": "strength 45 min (~220 cal)",
+        "detail": """WARM-UP (5 min)
+Arm circles, band pull-aparts, shoulder rolls, light cardio
+
+MAIN (35 min) — 60 sec rest between sets
+• Dumbbell Chest Flyes — 4x12 @ 15 lb
+• Single Arm Dumbbell Row — 4x10 @ 20 lb each arm
+• Arnold Press — 3x12 @ 15 lb
+• Hammer Curls — 3x12 @ 15 lb
+• Skull Crushers — 3x12 @ 15 lb
+• Rear Delt Flyes — 3x15 @ 10 lb
+• Dumbbell Pullover — 3x12 @ 20 lb
+
+COOL-DOWN (5 min)
+Lat stretch, chest doorframe stretch, child's pose
+
+Week 3: increase all weights 2.5-5 lb
+Week 4: final set of each exercise — drop weight 20%, go to failure""",
+    },
+    5: {  # Saturday — Lower Body C + Cardio
+        "name": "Lower Body C + Cardio Finisher",
+        "duration": "60 min",
+        "log": "strength + cardio 60 min (~380 cal)",
+        "detail": """WARM-UP (5 min)
+Bodyweight squats x15, hip circles, leg swings, glute bridges x10
+
+MAIN (35 min) — 60 sec rest between sets
+• Hip Thrusts — 4x12 @ 30 lb (heavier than Lower A if possible)
+• Sumo Squats — 4x12 @ 30 lb
+• Step-Ups — 3x10 each leg @ 20 lb each hand
+• Curtsy Lunges — 3x12 each leg @ 15 lb each hand
+• Hamstring Curls — 3x12 @ 15 lb dumbbell between feet
+• Standing Abductions — 3x15 each leg bodyweight
+
+CARDIO FINISHER (15 min)
+Incline treadmill walk — incline 8-10, speed 3.0-3.5
+OR bike at moderate resistance
+
+COOL-DOWN (5 min)
+Full lower body stretch — hip flexors, hamstrings, glutes, calves
+
+Week 3: increase all weights 5 lb
+Week 4: drop sets + push cardio finisher to 20 min""",
+    },
+    6: {  # Sunday — Yoga
+        "name": "Yoga + Full Rest",
+        "duration": "60 min",
+        "log": "yoga 60 min (~150 cal)",
+        "detail": """60 min yoga — your existing practice.
+Full rest from weights. Non-negotiable recovery day.
+Foam roll after if time allows.
+Meal prep for the week while you have energy.""",
+    },
+}
+
+# ── Meal Plans ──────────────────────────────────────────────────────────────────
+# Target: 1,400 cal / 110g+ protein. Log all exercise separately in Lose It.
+
+MEALS = {
     0: {  # Monday
-        "workout": "Upper Body Strength — bench press, rows, overhead press, 3x12. Walk commute = warm-up.",
         "meals": [
-            "Breakfast (350): Scrambled eggs (2) + whole wheat toast + sliced avocado",
-            "Lunch (400): Turkey & hummus wrap, spinach, cucumber, cherry tomatoes",
-            "Snack (150): Greek yogurt + handful of walnuts",
-            "Dinner (500): Grilled chicken thighs + roasted sweet potato + broccoli",
+            "Smoothie (300/28g): almond milk, protein powder, spinach, banana, frozen berries",
+            "Lunch (400/40g): Dig — chicken grain bowl, roasted veg, no bread",
+            "Snack (150/15g): Greek yogurt + mixed berries",
+            "Dinner (450/38g): Sheet pan salmon + roasted asparagus + half cup quinoa",
         ],
     },
     1: {  # Tuesday
-        "workout": "Cardio Intervals — 30 min run or bike, 1-min hard / 2-min easy. Walk commute counts.",
         "meals": [
-            "Breakfast (350): Oatmeal + banana + 1 tbsp peanut butter + cinnamon",
-            "Lunch (400): Big salad: tuna, mixed greens, olives, egg, lemon vinaigrette",
-            "Snack (150): Cottage cheese + sliced peach",
-            "Dinner (500): Shrimp stir-fry with bok choy, snap peas, brown rice",
+            "Smoothie (300/28g): almond milk, protein powder, spinach, frozen mango, chia seeds",
+            "Lunch (400/35g): Sweetgreen Harvest Bowl + grilled chicken, dressing on side",
+            "Snack (130/8g): Hard boiled egg + apple",
+            "Dinner (480/40g): Turkey taco bowl — turkey, black beans, salsa, half avocado",
         ],
     },
     2: {  # Wednesday
-        "workout": "Lower Body Strength — squats, Romanian deadlifts, lunges, glute bridges, 3x12. Walk commute = warm-up.",
         "meals": [
-            "Breakfast (350): Smoothie — spinach, frozen berries, banana, protein powder, almond milk",
-            "Lunch (400): Lentil soup + side of sliced cucumber + whole wheat pita",
-            "Snack (150): Apple + 1 tbsp almond butter",
-            "Dinner (500): Baked cod + roasted asparagus + quinoa",
+            "Smoothie (300/22g): almond milk, chocolate protein powder, peanut butter, banana",
+            "Lunch (400/30g): Tuna bowl — tuna, mixed greens, avocado, cherry tomatoes, lemon",
+            "Snack (150/8g): String cheese + pear",
+            "Dinner (450/35g): Baked cod + roasted broccoli + brown rice",
         ],
     },
     3: {  # Thursday
-        "workout": "HIIT Full Body — 20 min: burpees, mountain climbers, jump squats, push-ups. Walk commute = bonus.",
         "meals": [
-            "Breakfast (350): Greek yogurt + blueberries + honey + granola",
-            "Lunch (400): Kale salad: grilled chicken, chickpeas, cucumber, tahini dressing",
-            "Snack (150): Hard-boiled egg + carrots + hummus",
-            "Dinner (500): Baked salmon + roasted asparagus + brown rice",
+            "Smoothie (300/26g): almond milk, protein powder, frozen pineapple, frozen mango, spinach",
+            "Lunch (420/32g): Chopt or Dos Toros — salad or burrito bowl, no chips",
+            "Snack (150/18g): Cottage cheese + cherry tomatoes",
+            "Dinner (480/38g): Chicken stir fry — chicken, bok choy, snap peas, low sodium soy sauce, rice",
         ],
     },
     4: {  # Friday
-        "workout": "Active Recovery + Long Walk — 45-60 min walk (try Hudson River Park or High Line). Light stretching.",
         "meals": [
-            "Breakfast (350): Veggie omelet (2 eggs) + side of berries",
-            "Lunch (400): Grain bowl: farro, roasted veggies, feta, lemon-olive oil",
-            "Snack (150): Handful of almonds + clementine",
-            "Dinner (500): Turkey meatballs + zucchini noodles + marinara",
+            "Smoothie (330/27g): almond milk, protein powder, blueberries, rolled oats, honey",
+            "Lunch (400/35g): Grain bowl — quinoa, roasted veg, feta, lemon olive oil",
+            "Snack (150/10g): Almonds + clementine",
+            "Dinner (450/35g): Turkey meatballs + zucchini noodles + marinara",
         ],
     },
     5: {  # Saturday
-        "workout": "Long Cardio or Activity — 60 min hike, swim, yoga, or sport. Make it fun.",
         "meals": [
-            "Breakfast (350): Whole wheat pancakes (2 small) + fresh berries + maple syrup drizzle",
-            "Lunch (400): Avocado toast + poached egg + side salad",
-            "Snack (150): Edamame + cucumber slices",
-            "Dinner (500): Grilled flank steak + roasted cauliflower + mixed greens",
+            "Breakfast (350/20g): 2 eggs + avocado toast + berries",
+            "Lunch (400/25g): Cottage cheese plate + cucumber + tomato + rice cakes",
+            "Snack (150/8g): Edamame + cucumber",
+            "Dinner (480/35g): Grilled flank steak + roasted cauliflower + mixed greens",
         ],
     },
     6: {  # Sunday
-        "workout": "Rest + Gentle Movement — restorative yoga, short walk, foam rolling. Prep for the week.",
         "meals": [
-            "Breakfast (350): Smoked salmon + cream cheese on whole wheat bagel thin",
-            "Lunch (400): Chicken vegetable soup + whole wheat crackers",
-            "Snack (150): Pear + string cheese",
-            "Dinner (500): Roasted chicken breast + Brussels sprouts + mashed cauliflower",
+            "Breakfast (350/25g): Smoked salmon + cream cheese + whole wheat bagel thin",
+            "Lunch (400/30g): Chicken vegetable soup + whole wheat crackers",
+            "Snack (150/10g): Pear + string cheese",
+            "Dinner (480/35g): Roasted chicken breast + Brussels sprouts + mashed cauliflower",
         ],
     },
 }
 
+
 def get_health_section(now):
-    plan = HEALTH_PLAN[now.weekday()]
-    meal_lines = "\n".join(f"• {m}" for m in plan["meals"])
-    return f"Workout: {plan['workout']}\n{meal_lines}\nTotal: ~1,500 cal"
+    w = now.weekday()
+    workout = WORKOUTS[w]
+    meals = MEALS[w]
+    meal_lines = "\n".join(f"• {m}" for m in meals["meals"])
+    return (
+        f"TODAY: {workout['name']} — {workout['duration']}\n\n"
+        f"{workout['detail']}\n\n"
+        f"MEALS (~1,400 cal / 110g+ protein)\n"
+        f"{meal_lines}\n\n"
+        f"Log in Lose It: {workout['log']}"
+    )
+
 
 def get_health_sms(now):
-    plan = HEALTH_PLAN[now.weekday()]
-    lines = [plan["workout"]]
-    for m in plan["meals"]:
+    w = now.weekday()
+    workout = WORKOUTS[w]
+    meals = MEALS[w]
+    lines = [
+        f"Workout: {workout['name']} ({workout['duration']})",
+    ]
+    # Add first 3 lines of workout detail (warm-up omitted for SMS brevity)
+    detail_lines = [l.strip() for l in workout['detail'].split('\n') if l.strip() and l.strip().startswith('•')]
+    lines.append("Key moves: " + ", ".join(l.lstrip('• ').split(' — ')[0] for l in detail_lines[:4]))
+    lines.append("")
+    for m in meals["meals"]:
         lines.append(m)
-    lines.append("Total: ~1,500 cal")
+    lines.append(f"Log: {workout['log']}")
     return "\n".join(lines)
 
 
 # ── Available.page schedule ─────────────────────────────────────────────────────
 
 def fetch_available_schedule(today_str):
-    """Fetch busy blocks from dbeg-dev/available and return today's schedule."""
     try:
         resp = requests.get(
             "https://raw.githubusercontent.com/dbeg-dev/available/main/index.html",
@@ -101,19 +261,13 @@ def fetch_available_schedule(today_str):
         )
         resp.raise_for_status()
         html = resp.text
-
         match = re.search(r'const BUSY\s*=\s*(\[.*?\]);', html, re.DOTALL)
         if not match:
-            print("Available: could not find BUSY array")
             return None
-
         busy = json.loads(match.group(1))
         today_blocks = [b for b in busy if b["s"].startswith(today_str)]
-
         if not today_blocks:
-            print(f"Available: no blocks found for {today_str}")
             return None
-
         events = sorted(today_blocks, key=lambda b: b["s"])
         merged = []
         for b in events:
@@ -125,45 +279,32 @@ def fetch_available_schedule(today_str):
                 merged[-1] = (merged[-1][0], max(e, merged[-1][1]))
             else:
                 merged.append((s, e))
-
         lines = []
         for s, e in merged:
-            s_str = s.strftime("%-I:%M %p")
-            e_str = e.strftime("%-I:%M %p")
-            lines.append(f"• {s_str} – {e_str}: Blocked")
-
-        print(f"Available: found {len(merged)} blocks for {today_str}")
+            lines.append(f"• {s.strftime('%-I:%M %p')} – {e.strftime('%-I:%M %p')}: Blocked")
         return "\n".join(lines)
-
     except Exception as ex:
         print(f"Available schedule error: {ex}")
         return None
 
 
-# ── Calendar ────────────────────────────────────────────────────────────────
+# ── Calendar ─────────────────────────────────────────────────────────────────────
 
 def fetch_google_events(now):
     creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
     calendar_id = os.environ.get("GOOGLE_CALENDAR_ID", "primary")
-    print(f"Google Calendar secrets present: credentials_json={'yes' if creds_json else 'NO'}, calendar_id={calendar_id}")
-
     if not creds_json:
-        print("Google Calendar: skipping — GOOGLE_CREDENTIALS_JSON not set")
         return []
-
     try:
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
-
         creds = service_account.Credentials.from_service_account_info(
             json.loads(creds_json),
             scopes=["https://www.googleapis.com/auth/calendar.readonly"],
         )
         service = build("calendar", "v3", credentials=creds)
-
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = now.replace(hour=23, minute=59, second=59, microsecond=0)
-
         result = service.events().list(
             calendarId=calendar_id,
             timeMin=day_start.isoformat(),
@@ -171,9 +312,7 @@ def fetch_google_events(now):
             singleEvents=True,
             orderBy="startTime",
         ).execute()
-
         return result.get("items", [])
-
     except Exception as e:
         print(f"Google Calendar error: {e}")
         return []
@@ -184,41 +323,27 @@ def fetch_outlook_events(now):
     client_secret = os.environ.get("MS_CLIENT_SECRET")
     tenant_id = os.environ.get("MS_TENANT_ID")
     user_email = os.environ.get("MS_USER_EMAIL")
-
     if not all([client_id, client_secret, tenant_id, user_email]):
         return []
-
     try:
         import msal
-
         app = msal.ConfidentialClientApplication(
-            client_id,
-            authority=f"https://login.microsoftonline.com/{tenant_id}",
+            client_id, authority=f"https://login.microsoftonline.com/{tenant_id}",
             client_credential=client_secret,
         )
-        token_result = app.acquire_token_for_client(
-            scopes=["https://graph.microsoft.com/.default"]
-        )
+        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
         if "access_token" not in token_result:
-            print(f"Outlook auth error: {token_result.get('error_description')}")
             return []
-
         day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         day_end = now.replace(hour=23, minute=59, second=59, microsecond=0)
-
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/calendarView",
             headers={"Authorization": f"Bearer {token_result['access_token']}"},
-            params={
-                "startDateTime": day_start.isoformat(),
-                "endDateTime": day_end.isoformat(),
-                "$orderby": "start/dateTime",
-                "$select": "subject,start,end,location",
-            },
+            params={"startDateTime": day_start.isoformat(), "endDateTime": day_end.isoformat(),
+                    "$orderby": "start/dateTime", "$select": "subject,start,end,location"},
         )
         resp.raise_for_status()
         return resp.json().get("value", [])
-
     except Exception as e:
         print(f"Outlook Calendar error: {e}")
         return []
@@ -230,66 +355,46 @@ def format_calendar_events(google_events, outlook_events, tz):
         start = e.get("start", {})
         raw = start.get("dateTime") or start.get("date", "")
         label = datetime.fromisoformat(raw).astimezone(tz).strftime("%-I:%M %p") if "T" in raw else "All day"
-        lines.append(f"• {label} — {e.get('summary', 'Untitled')} [Google]")
+        lines.append(f"• {label} — {e.get('summary', 'Untitled')}")
     for e in outlook_events:
         raw = e.get("start", {}).get("dateTime", "")
         label = datetime.fromisoformat(raw).astimezone(tz).strftime("%-I:%M %p") if raw else "All day"
-        lines.append(f"• {label} — {e.get('subject', 'Untitled')} [Outlook]")
+        lines.append(f"• {label} — {e.get('subject', 'Untitled')}")
     return "\n".join(lines) if lines else None
 
 
-# ── Email ───────────────────────────────────────────────────────────────────
+# ── Email ─────────────────────────────────────────────────────────────────────────
 
 def fetch_gmail_emails():
     client_id = os.environ.get("GOOGLE_CLIENT_ID")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
     refresh_token = os.environ.get("GOOGLE_REFRESH_TOKEN")
-    print(f"Gmail secrets present: client_id={'yes' if client_id else 'NO'}, client_secret={'yes' if client_secret else 'NO'}, refresh_token={'yes' if refresh_token else 'NO'}")
-
     if not all([client_id, client_secret, refresh_token]):
-        print("Gmail: skipping — one or more secrets missing")
         return []
-
     try:
         token_resp = requests.post("https://oauth2.googleapis.com/token", data={
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "refresh_token": refresh_token,
-            "grant_type": "refresh_token",
+            "client_id": client_id, "client_secret": client_secret,
+            "refresh_token": refresh_token, "grant_type": "refresh_token",
         })
-        print(f"Gmail token exchange status: {token_resp.status_code}")
-        if not token_resp.ok:
-            print(f"Gmail token error body: {token_resp.text}")
         token_resp.raise_for_status()
         access_token = token_resp.json()["access_token"]
-
         headers = {"Authorization": f"Bearer {access_token}"}
         search = requests.get(
             "https://gmail.googleapis.com/gmail/v1/users/me/messages",
-            headers=headers,
-            params={"q": "is:unread newer_than:2d", "maxResults": 20},
+            headers=headers, params={"q": "is:unread newer_than:2d", "maxResults": 20},
         )
-        print(f"Gmail search status: {search.status_code}")
-        if not search.ok:
-            print(f"Gmail search error body: {search.text}")
         search.raise_for_status()
-        messages = search.json().get("messages", [])
-        print(f"Gmail: found {len(messages)} unread messages")
-
         emails = []
-        for msg in messages[:15]:
+        for msg in search.json().get("messages", [])[:15]:
             detail = requests.get(
                 f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{msg['id']}",
                 headers=headers,
-                params={"format": "metadata", "metadataHeaders": ["From", "Subject", "Date"]},
+                params={"format": "metadata", "metadataHeaders": ["From", "Subject"]},
             )
             detail.raise_for_status()
             hdrs = {h["name"]: h["value"] for h in detail.json().get("payload", {}).get("headers", [])}
             emails.append(f"[Gmail] From: {hdrs.get('From', '?')} | Subject: {hdrs.get('Subject', '(no subject)')}")
-
-        print(f"Gmail: fetched {len(emails)} email summaries")
         return emails
-
     except Exception as e:
         print(f"Gmail error: {e}")
         return []
@@ -300,36 +405,24 @@ def fetch_teams_messages():
     client_secret = os.environ.get("MS_CLIENT_SECRET")
     tenant_id = os.environ.get("MS_TENANT_ID")
     user_email = os.environ.get("MS_USER_EMAIL")
-
     if not all([client_id, client_secret, tenant_id, user_email]):
         return []
-
     try:
         import msal
-
         app = msal.ConfidentialClientApplication(
-            client_id,
-            authority=f"https://login.microsoftonline.com/{tenant_id}",
+            client_id, authority=f"https://login.microsoftonline.com/{tenant_id}",
             client_credential=client_secret,
         )
-        token_result = app.acquire_token_for_client(
-            scopes=["https://graph.microsoft.com/.default"]
-        )
+        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
         if "access_token" not in token_result:
-            print(f"Teams auth error: {token_result.get('error_description')}")
             return []
-
-        headers = {"Authorization": f"Bearer {token_result['access_token']}"}
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/chats",
-            headers=headers,
+            headers={"Authorization": f"Bearer {token_result['access_token']}"},
             params={"$expand": "lastMessagePreview", "$top": 10},
         )
-        print(f"Teams chats status: {resp.status_code}")
         if not resp.ok:
-            print(f"Teams chats error body: {resp.text}")
             return []
-
         messages = []
         for chat in resp.json().get("value", []):
             preview = chat.get("lastMessagePreview", {})
@@ -339,10 +432,7 @@ def fetch_teams_messages():
             body = preview.get("body", {}).get("content", "")[:120].replace("\n", " ")
             topic = chat.get("topic") or f"Chat with {sender}"
             messages.append(f"[Teams] {topic} — {sender}: {body}")
-
-        print(f"Teams: fetched {len(messages)} recent chat previews")
         return messages
-
     except Exception as e:
         print(f"Teams error: {e}")
         return []
@@ -353,33 +443,22 @@ def fetch_outlook_emails():
     client_secret = os.environ.get("MS_CLIENT_SECRET")
     tenant_id = os.environ.get("MS_TENANT_ID")
     user_email = os.environ.get("MS_USER_EMAIL")
-
     if not all([client_id, client_secret, tenant_id, user_email]):
         return []
-
     try:
         import msal
-
         app = msal.ConfidentialClientApplication(
-            client_id,
-            authority=f"https://login.microsoftonline.com/{tenant_id}",
+            client_id, authority=f"https://login.microsoftonline.com/{tenant_id}",
             client_credential=client_secret,
         )
-        token_result = app.acquire_token_for_client(
-            scopes=["https://graph.microsoft.com/.default"]
-        )
+        token_result = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
         if "access_token" not in token_result:
             return []
-
         resp = requests.get(
             f"https://graph.microsoft.com/v1.0/users/{user_email}/messages",
             headers={"Authorization": f"Bearer {token_result['access_token']}"},
-            params={
-                "$filter": "isRead eq false",
-                "$orderby": "receivedDateTime desc",
-                "$select": "from,subject,receivedDateTime",
-                "$top": 20,
-            },
+            params={"$filter": "isRead eq false", "$orderby": "receivedDateTime desc",
+                    "$select": "from,subject,receivedDateTime", "$top": 20},
         )
         resp.raise_for_status()
         emails = []
@@ -387,13 +466,12 @@ def fetch_outlook_emails():
             sender = e.get("from", {}).get("emailAddress", {}).get("name", "?")
             emails.append(f"[Outlook] From: {sender} | Subject: {e.get('subject', '(no subject)')}")
         return emails
-
     except Exception as e:
         print(f"Outlook email error: {e}")
         return []
 
 
-# ── Core ────────────────────────────────────────────────────────────────────────
+# ── Core ──────────────────────────────────────────────────────────────────────────
 
 def extract_section(text, start_tag, end_tag):
     start = text.find(start_tag)
@@ -405,7 +483,6 @@ def extract_section(text, start_tag, end_tag):
 
 def generate_briefing():
     client = anthropic.Anthropic()
-
     tz = ZoneInfo("America/New_York")
     now = datetime.now(tz)
     today = now.strftime("%A, %B %-d, %Y")
@@ -423,7 +500,6 @@ def generate_briefing():
     today_str = now.strftime("%Y-%m-%d")
     available_schedule = fetch_available_schedule(today_str)
 
-    # Health plan for today
     health_section = get_health_section(now)
     health_sms = get_health_sms(now)
 
@@ -431,89 +507,86 @@ def generate_briefing():
         calendar_section = f"TODAY'S CALENDAR (live):\n{calendar_text}"
     elif available_schedule:
         calendar_section = (
-            f"TODAY'S SCHEDULE (from availability page — these are confirmed blocked/busy times):\n"
-            f"{available_schedule}\n"
-            f"Working hours: 10:00 AM – 5:00 PM ET. Any unlisted time in that window is free."
+            f"TODAY'S SCHEDULE (from availability page):\n{available_schedule}\n"
+            f"Working hours: 10:00 AM – 5:00 PM ET. Any unlisted time is free."
         )
     else:
-        calendar_section = "TODAY'S CALENDAR: No calendar data available — suggest a productive day structure."
+        calendar_section = "TODAY'S CALENDAR: No data — suggest a focused job search day structure."
 
     email_section = (
         f"RECENT UNREAD EMAILS + TEAMS CHATS (live):\n" + "\n".join(all_emails)
         if all_emails else
-        "RECENT UNREAD EMAILS + TEAMS CHATS: No credentials configured — use these known standing priorities:\n"
-        "- Ruvym Gilman / Birthright Israel Foundation: SVP role follow-up\n"
-        "- Vivian Chan / Austen Riggs: LFE May 1-3 registration (time-sensitive)\n"
-        "- Elissa Ganz: pending reply\n"
-        "- Victoria Valenti (Fi) and Somer Reznick (Kindred): SVP check-ins"
+        "RECENT UNREAD EMAILS + TEAMS CHATS: No credentials — use standing priorities:\n"
+        "- Birthright Israel Foundation: SVP role follow-up\n"
+        "- Victoria Valenti (Fi) and Somer Reznick (Kindred): SVP check-ins\n"
+        "- Elissa Ganz / ZRG Partners: pending reply"
     )
 
-    prompt = f"""Generate Dory's morning briefing for {today} at {time_str}. Dory lives in Manhattan, NYC (zip code 10003) — busy professional, active job search (SVP role discussions at Birthright Israel Foundation, Fi, Kindred), young family, interests in fashion/arts/culture.
+    prompt = f"""Generate Dory's morning briefing for {today} at {time_str}.
+Dory: Manhattan NYC (112 E 17th St, zip 10003). SVP job search. Office at 622 Third Ave Mon-Thu. Walks 30 min each way daily.
 
-Use web search to get TODAY's live weather forecast specifically for Manhattan, New York City, NY 10003. Search for "Manhattan NYC weather today {now.strftime('%B %d %Y')}".
+CRITICAL: Search "Manhattan NYC weather {now.strftime('%B %d %Y')}" for live weather for zip 10003.
 
 {calendar_section}
 
 {email_section}
 
-HEALTH PLAN FOR TODAY (pre-generated — include exactly as-is in the HEALTH and SMS sections):
+HEALTH PLAN FOR TODAY (pre-generated — include verbatim):
 {health_section}
 
-Generate these sections with EXACT delimiters:
+Generate with EXACT delimiters:
 
 WEATHER_START
-[2-3 sentences: current temp, conditions, precipitation, walking suitability — Manhattan specific]
+[2-3 sentences: Manhattan-specific temp, conditions, walking suitability]
 WEATHER_END
 
 OUTFIT_START
-[3-4 sentences: specific outfit suited to weather + professional day. Reference her brands: Scanlan Theodore, Ferragamo, On Running, Lululemon, Ralph Lauren, Theory, David Yurman. Be specific — colors, layers, shoes.]
+[3-4 sentences: specific outfit for weather + day. Brands: Scanlan Theodore, Ferragamo, On Running, Lululemon, Ralph Lauren, Theory, David Yurman.]
 OUTFIT_END
 
 CALENDAR_START
-[Format today's actual calendar events into a clean schedule with prep notes. If no live events, suggest a focused day structure for job search momentum.]
+[Clean schedule with prep notes. If no events, focused job search structure.]
 CALENDAR_END
 
 EMAIL_START
-[Using the actual unread emails above, identify and summarize the top 3-5 priority action items. Flag anything time-sensitive. If no live emails, use the standing priorities listed above.]
+[Top 3-5 priority actions. Flag time-sensitive items.]
 EMAIL_END
 
 HEALTH_START
-[Insert the pre-generated health plan exactly as provided above — do not modify it.]
+[Insert the pre-generated health plan exactly as provided — do not modify.]
 HEALTH_END
 
 WELLNESS_START
-[2-3 bullet wellness tips for the day — hydration, energy, focus. Do NOT repeat the workout or meals here.]
+[2-3 bullet wellness tips — hydration, energy, focus. Do NOT repeat workout or meals.]
 WELLNESS_END
 
 SMS_START
-Write Dory's morning SMS as a clean plain-text digest. Use this exact format — no markdown, no bold, no run-ons:
-
 Good morning Dory [day] [date]
 
 WEATHER
-[one line: temp, condition, what to bring — Manhattan specific]
+[one line: temp, condition, what to bring]
 
 WEAR
 [one line: specific outfit]
 
 TODAY
-[one line per calendar event or free window — keep it short]
+[one line per calendar block]
 
 PRIORITIES
-[one line per top 3 email actions — person + what to do]
+[one line per top 3 actions]
 
 HEALTH
-[Insert the pre-generated health SMS lines exactly as provided — workout + 4 meals + total]
+[Insert health SMS lines exactly as provided]
 
 WELLNESS
 [one line tip]
 
-Keep every line under 55 characters. Phone-readable. No symbols except — for separators.
+Max 55 chars per line. No markdown.
 SMS_END"""
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=3000,
+        max_tokens=4000,
         tools=[{"type": "web_search_20250305", "name": "web_search"}],
         messages=[{"role": "user", "content": prompt}],
     )
